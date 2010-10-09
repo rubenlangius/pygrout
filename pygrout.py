@@ -3,8 +3,10 @@
 from math import hypot
 from itertools import count, izip
 import pprint
+import sys
 
 NO_NUMPY = False
+DEBUG_INIT = False
 
 ID, X, Y, DEM, A, B, SRV = range(7)
 
@@ -34,6 +36,7 @@ class VrptwTask(object):
         except ImportError:
             # no numpy - list fallback
             # distances between customers
+            sys.stderr.write("Warning: Not using NumPy\n")
             self.dist = [
                 [ hypot(self.cust[i][X]-self.cust[j][X],
                         self.cust[i][Y]-self.cust[j][Y])
@@ -64,6 +67,9 @@ class VrptwSolution(object):
         return self.task.cust[c][B]
     def dem(self, c):
         return self.task.cust[c][DEM]
+
+class UndoStack(object):
+    """Holds description of a sequence of operations, possibly separated by checkpoints."""
 
 # route    
 R_LEN, R_CAP, R_DIS, R_EDG = range(4)
@@ -140,13 +146,17 @@ def insert_customer(sol, c):
         #
         if bd:
             insert_at_pos(sol, c, br, bp)
+            if DEBUG_INIT:
+                print "Cust %d to route %d pos %d after %d" % (
+                    c, br, bp, sol.r[br][R_EDG][bp][E_FRO] )
         else:
             insert_new(sol, c)
+            if DEBUG_INIT:
+                print c, ">new", len(sol.r)
 
 def build_first(sol):
     """Greedily construct the first solution."""
-    for c in sorted(sol.task.cust[1:], key=lambda c: c[A]-c[B]):
-        print c, c[A]-c[B]
+    for c in sorted(sol.task.cust[1:], key=lambda c: c[B]-c[A]):
         insert_customer(sol, c[ID])
 
 def symbol(i):
@@ -196,12 +206,28 @@ def print_like_Czarnas(sol):
     for 1000 - 4 000 000 > 2**21, multiplied by 6 decimal places (20 bits)
     additionally, TODO
     """
-    print "Solution:\nRoutes: %d\n"
+    routeCostMultiplier = 40000
+    value = sol.dist + len(sol.r) * routeCostMultiplier
+    result = "Solution:\nRoutes: %d\n" % (len(sol.r))
+    result += "Vehicle capacity: %.2f\nSolution value: %.3f\n" % (sol.task.capa, value)
+    result += "Total travel distance: %.3f" % sol.dist
+    for rt, num in zip(sol.r, count(1)):
+        result += "Route: %d, len: %d, dist: %.3f, max cap: %.2f" % (
+                num, rt[R_LEN], rt[R_DIS], rt[R_CAP])
+        result += ", route: "+"-".join(
+                str(e[E_FRO]) for e in rt[R_EDG][1:] )+"\n"
+    print result
     
 def main():
     """Entry point when this module is ran at top-level.
     This function may change, testing some current new functionality."""
-    s = VrptwSolution(VrptwTask('solomons/c101.txt'))
+    test = 'solomons/c101.txt'
+    
+    if len(sys.argv) < 2:
+        sys.stderr.write("usage: %s benchmark_file.txt\nUsing default benchmark: %s\n" % (sys.argv[0], test))
+    else:
+        test = sys.argv[1]
+    s = VrptwSolution(VrptwTask(test))
     build_first(s)
     print_like_Czarnas(s)
 
