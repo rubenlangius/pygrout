@@ -48,6 +48,14 @@ class VrptwTask(object):
                 [ elem  + self.cust[j][SRV] for elem in self.dist[j] ]
                  for j in xrange(len(self.dist))
             ]
+    def checkRoute(self, route):
+        """Displays a route summary."""
+        prev, arr, dist = 0, 0.0, 0.0
+        for next in route:
+            n_arr = max(arr+self.time[prev][next], self.cust[next][A])
+            print self.cust[next], n_arr, dist
+            prev, arr, dist = next, n_arr, dist + self.dist[prev][next]
+            
     
 class VrptwSolution(object):
     """A routes (lists of customer IDs) collection, basically."""
@@ -129,34 +137,37 @@ def find_bestpos_on(sol, c, r):
         return None, None
     # check route edges
     for (a, b, arr_a, larr_b), i in izip(sol.r[r][R_EDG], count()):
-        if arr_a + sol.t(a, c) + sol.t(c, b) <= larr_b: #TODO: too weak cond!
-            distinc = sol.d(a, c) + sol.d(c, b) - sol.d(a, b)
-            if mininc < -distinc:
-                pos, mininc = i, -distinc
+        arr_c = max(arr_a + sol.t(a, c), sol.a(c))
+        if  arr_c <= sol.b(c) and arr_c + sol.t(c, b) <= larr_b: #TODO: too weak cond!
+            distinc = -(sol.d(a, c) + sol.d(c, b) - sol.d(a, b))
+            if mininc < distinc:
+                pos, mininc = i, distinc
     return mininc, pos
     
 def insert_customer(sol, c):
     """Insert customer at best position or new route."""
     if not len(sol.r):
         insert_new(sol, c)
+        if DEBUG_INIT:
+                print c, ">new", len(sol.r)-1
     else:
         # best distinc, best pos, best route
         (bd, bp), br = max(
             (find_bestpos_on(sol, c, rn), rn) for rn in xrange(len(sol.r)) )
-        #
-        if bd:
+        # found some route to insert
+        if not bd is None:
             insert_at_pos(sol, c, br, bp)
             if DEBUG_INIT:
-                print "Cust %d to route %d pos %d after %d" % (
-                    c, br, bp, sol.r[br][R_EDG][bp][E_FRO] )
+                print "Cust %d to route %d after %d distinc %.3f" % (
+                    c, br, sol.r[br][R_EDG][bp][E_FRO], -bd )
         else:
             insert_new(sol, c)
             if DEBUG_INIT:
-                print c, ">new", len(sol.r)
+                print c, ">new", len(sol.r)-1
 
-def build_first(sol):
+def build_first(sol, sortkey = lambda c: c[B]-c[A]):
     """Greedily construct the first solution."""
-    for c in sorted(sol.task.cust[1:], key=lambda c: c[B]-c[A]):
+    for c in sorted(sol.task.cust[1:], key=sortkey):
         insert_customer(sol, c[ID])
 
 def symbol(i):
@@ -210,7 +221,7 @@ def print_like_Czarnas(sol):
     value = sol.dist + len(sol.r) * routeCostMultiplier
     result = "Solution:\nRoutes: %d\n" % (len(sol.r))
     result += "Vehicle capacity: %.2f\nSolution value: %.3f\n" % (sol.task.capa, value)
-    result += "Total travel distance: %.3f" % sol.dist
+    result += "Total travel distance: %.3f\n" % sol.dist
     for rt, num in zip(sol.r, count(1)):
         result += "Route: %d, len: %d, dist: %.3f, max cap: %.2f" % (
                 num, rt[R_LEN], rt[R_DIS], rt[R_CAP])
@@ -227,9 +238,17 @@ def main():
         sys.stderr.write("usage: %s benchmark_file.txt\nUsing default benchmark: %s\n" % (sys.argv[0], test))
     else:
         test = sys.argv[1]
-    s = VrptwSolution(VrptwTask(test))
-    build_first(s)
-    print_like_Czarnas(s)
+    
+    sorters = [ 
+               lambda x: x[B]-x[A], # ascending TW
+               lambda x: x[A]-x[B], # descending TW
+               lambda x: 0 # unsorted
+               ]
+    task = VrptwTask(test)
+    s = [ VrptwSolution(task) for x in sorters ]
+    for data in zip(s, sorters):
+        build_first(*data)
+    print task.name, [ (sol.k, sol.dist) for sol in s ]
 
 if __name__=='__main__':
     main()
