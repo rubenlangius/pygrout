@@ -119,7 +119,12 @@ def insert_at_pos(sol, c, r, pos):
             break
         edges[i][E_ARF], prev_arr, prev = prev_arr, prev_arr+sol.t(prev, p), p
     # propagate time window constraints - backward
-            
+    next_larr, next = larr_c - sol.t(a,c), c
+    for i in range(pos-1, -1, -1):
+        p, n, arr, larr = edges[i]
+        if next_larr > larr: # first early close
+            break
+        edges[i][E_LAT], next_larr, next = next_larr, next_larr-sol.t(n, next), n
     # update distances
     dinc = sol.d(a, c)+sol.d(c, b)-sol.d(a, b)
     sol.r[r][R_DIS] += dinc
@@ -228,6 +233,27 @@ def print_like_Czarnas(sol):
         result += ", route: "+"-".join(
                 str(e[E_FRO]) for e in rt[R_EDG][1:] )+"\n"
     print result
+
+def test_initial_sorting(test):
+    sorters = [ 
+               lambda x: x[B]-x[A], # ascending TW
+               lambda x: x[A]-x[B], # descending TW
+               lambda x: 0 # unsorted
+               ]
+    task = VrptwTask(test)
+    s = [ VrptwSolution(task) for x in sorters ]
+    for data in zip(s, sorters):
+        build_first(*data)
+    results = [ (sol.k, sol.dist) for sol in s ]
+    best = map(lambda x: x[1], sorted(zip(results, range(1,4))))
+    print task.name, results, best 
+    
+def test_initial_creation(test):
+    global DEBUG_INIT
+    s = VrptwSolution(VrptwTask(test))
+    DEBUG_INIT = True
+    build_first(s)
+    print_like_Czarnas(s)    
     
 def main():
     """Entry point when this module is ran at top-level.
@@ -238,17 +264,7 @@ def main():
         sys.stderr.write("usage: %s benchmark_file.txt\nUsing default benchmark: %s\n" % (sys.argv[0], test))
     else:
         test = sys.argv[1]
-    
-    sorters = [ 
-               lambda x: x[B]-x[A], # ascending TW
-               lambda x: x[A]-x[B], # descending TW
-               lambda x: 0 # unsorted
-               ]
-    task = VrptwTask(test)
-    s = [ VrptwSolution(task) for x in sorters ]
-    for data in zip(s, sorters):
-        build_first(*data)
-    print task.name, [ (sol.k, sol.dist) for sol in s ]
+    test_initial_sorting(test)
 
 if __name__=='__main__':
     main()
