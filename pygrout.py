@@ -4,6 +4,7 @@ from math import hypot
 from itertools import count, izip
 import pprint
 import sys
+import operator
 
 NO_NUMPY = False
 DEBUG_INIT = False
@@ -43,7 +44,7 @@ class VrptwTask(object):
                   for j in xrange(len(self.cust))
                 ] for i in xrange(len(self.cust))
             ]
-            # travel times including 
+            # travel times including service
             self.time = [
                 [ elem  + self.cust[j][SRV] for elem in self.dist[j] ]
                  for j in xrange(len(self.dist))
@@ -56,6 +57,9 @@ class VrptwTask(object):
             print self.cust[next], n_arr, dist
             prev, arr, dist = next, n_arr, dist + self.dist[prev][next]
             
+def error(msg):
+    """A function to print or suppress errors."""
+    print msg
     
 class VrptwSolution(object):
     """A routes (lists of customer IDs) collection, basically."""
@@ -75,6 +79,38 @@ class VrptwSolution(object):
         return self.task.cust[c][B]
     def dem(self, c):
         return self.task.cust[c][DEM]
+    def check(self, complete=False):
+        """Checks solution, possibly partial, for inconsistency."""
+        unserviced = set(range(1, self.task.N+1))
+        for i in xrange(len(self.r)):
+            print "route", i
+            now, dist, cap, l = 0, 0, 0, 0
+            for fro, to, afro, lato in self.r[i][R_EDG]:
+                actual = max(now, self.a(fro))
+                if afro <> actual:
+                    error("Wrong time: %.2f (expected %.2f, err %.3f) on rt %d"
+                          " edge %d from %d to %d, a(from) %d" 
+                          % (afro, actual, actual-afro, i, l, fro, to, self.a(fro)))
+                    # return False
+                if fro:
+                    if not fro in unserviced:
+                        error("Customer %d serviced again on route %d" % (fro, i))
+                    else:
+                        unserviced.remove(fro)
+                dist += self.d(fro, to)
+                cap += self.dem(fro)
+                if cap > self.task.capa:
+                    error("Vehicle capacity exceeded on route %d with customer %d" % (i, fro))
+                l += 1
+                now = actual + self.t(fro, to)
+            if l != self.r[i][R_LEN]:
+                error("Wrong length %d (actual %d) for route %d" % (self.r[i][R_LEN], l, i))
+        if len(unserviced) and complete:
+            error("Unserviced customers left: " + ", ".join(str(x) for x in sorted(unserviced)))
+    def check_full(self):
+        """Check full solution - shorthand method."""
+        return self.check(True)
+        
 
 class UndoStack(object):
     """Holds description of a sequence of operations, possibly separated by checkpoints."""
@@ -143,7 +179,7 @@ def find_bestpos_on(sol, c, r):
     # check route edges
     for (a, b, arr_a, larr_b), i in izip(sol.r[r][R_EDG], count()):
         arr_c = max(arr_a + sol.t(a, c), sol.a(c))
-        if  arr_c <= sol.b(c) and arr_c + sol.t(c, b) <= larr_b: #TODO: too weak cond!
+        if  arr_c <= sol.b(c) and arr_c + sol.t(c, b) <= larr_b:
             distinc = -(sol.d(a, c) + sol.d(c, b) - sol.d(a, b))
             if mininc < distinc:
                 pos, mininc = i, distinc
@@ -234,6 +270,10 @@ def print_like_Czarnas(sol):
                 str(e[E_FRO]) for e in rt[R_EDG][1:] )+"\n"
     print result
 
+def print_like_Czarnas_long(sol):
+    """Prints a verbose description of the solution (one line per customer).
+    Compatible with the printSolutionAllData() method in the reference code"""
+    
 def test_initial_sorting(test):
     sorters = [ 
                lambda x: x[B]-x[A], # ascending TW
@@ -247,6 +287,8 @@ def test_initial_sorting(test):
     results = [ (sol.k, sol.dist) for sol in s ]
     best = map(lambda x: x[1], sorted(zip(results, range(1,4))))
     print task.name, results, best 
+    s[0].check()
+    pprint.pprint(s[0].r[11])
     
 def test_initial_creation(test):
     global DEBUG_INIT
@@ -264,6 +306,7 @@ def main():
         sys.stderr.write("usage: %s benchmark_file.txt\nUsing default benchmark: %s\n" % (sys.argv[0], test))
     else:
         test = sys.argv[1]
+        
     test_initial_sorting(test)
 
 if __name__=='__main__':
