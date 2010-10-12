@@ -7,7 +7,7 @@ import sys
 import operator
 
 NO_NUMPY = False
-DEBUG_INIT = False
+DEBUG_INIT = True
 
 ID, X, Y, DEM, A, B, SRV = range(7)
 
@@ -79,25 +79,31 @@ class VrptwSolution(object):
         return self.task.cust[c][B]
     def dem(self, c):
         return self.task.cust[c][DEM]
+    def route(self, i):
+        return "-".join(str(e[0]) for e in self.r[i][R_EDG])
     def check(self, complete=False):
         """Checks solution, possibly partial, for inconsistency."""
         unserviced = set(range(1, self.task.N+1))
         for i in xrange(len(self.r)):
-            print "route", i
             now, dist, cap, l = 0, 0, 0, 0
+            prevd = None
             for fro, to, afro, lato in self.r[i][R_EDG]:
                 actual = max(now, self.a(fro))
                 if afro <> actual:
                     error("Wrong time: %.2f (expected %.2f, err %.3f) on rt %d"
                           " edge %d from %d to %d, a(from) %d" 
                           % (afro, actual, actual-afro, i, l, fro, to, self.a(fro)))
-                    # return False
+                    print self.route(i)
+                    print prevd
+                    pprint.pprint(self.r[i][R_EDG])
+                    return False
                 if fro:
                     if not fro in unserviced:
                         error("Customer %d serviced again on route %d" % (fro, i))
                     else:
                         unserviced.remove(fro)
                 dist += self.d(fro, to)
+                prevd = self.d(fro, to)
                 cap += self.dem(fro)
                 if cap > self.task.capa:
                     error("Vehicle capacity exceeded on route %d with customer %d" % (i, fro))
@@ -107,6 +113,9 @@ class VrptwSolution(object):
                 error("Wrong length %d (actual %d) for route %d" % (self.r[i][R_LEN], l, i))
         if len(unserviced) and complete:
             error("Unserviced customers left: " + ", ".join(str(x) for x in sorted(unserviced)))
+        print "Check OK"
+        return True
+    
     def check_full(self):
         """Check full solution - shorthand method."""
         return self.check(True)
@@ -148,8 +157,8 @@ def insert_at_pos(sol, c, r, pos):
     edges.insert(pos, [c, b, arr_c, larr_b])
     edges.insert(pos, [a, c, arr_a, larr_c])
     # propagate time window constraints - forward
-    prev_arr, prev  = arr_a + sol.t(a, c), c
-    for i in range(pos+1, len(edges)):
+    prev_arr, prev  = arr_c + sol.t(c, b), c
+    for i in range(pos+2, len(edges)):
         p, n, arr, larr = edges[i]
         if prev_arr < arr: # first wait for time window
             break
@@ -210,6 +219,9 @@ def build_first(sol, sortkey = lambda c: c[B]-c[A]):
     """Greedily construct the first solution."""
     for c in sorted(sol.task.cust[1:], key=sortkey):
         insert_customer(sol, c[ID])
+        pprint.pprint(sol.r[min(2,len(sol.r)-1)][R_EDG])
+        if not sol.check():
+            exit()
 
 def symbol(i):
     """Return a suitable symbol for displaying the customer"""
