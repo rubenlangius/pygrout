@@ -10,7 +10,7 @@ import operator
 from compat import *
 
 NO_NUMPY = False
-DEBUG_INIT = True
+DEBUG_INIT = False
 
 # tuple indices in customer tuple:
 # number, coordinates(X,Y), demand, ready(A), due(B), service time
@@ -111,7 +111,6 @@ class VrptwSolution(object):
         unserviced = set(range(1, self.task.N+1))
         for i in xrange(len(self.r)):
             now, dist, cap, l = 0, 0, 0, 0
-            prevd = None
             for fro, to, afro, lato in self.r[i][R_EDG]:
                 actual = max(now, self.a(fro))
                 if afro <> actual:
@@ -119,8 +118,6 @@ class VrptwSolution(object):
                           " edge %d from %d to %d, a(from) %d" 
                           % (afro, actual, actual-afro, i, l, fro, to, self.a(fro)))
                     print self.route(i)
-                    print prevd
-                    pprint.pprint(self.r[i][R_EDG])
                     return False
                 if fro:
                     if not fro in unserviced:
@@ -145,11 +142,8 @@ class VrptwSolution(object):
         """Check full solution - shorthand method."""
         return self.check(True)
 
-        
 
-class UndoStack(object):
-    """Holds description of a sequence of operations, possibly separated by checkpoints."""
-
+    
 def insert_new(sol, c):
     """Inserts customer C on a new route."""
     sol.r.append( [
@@ -170,10 +164,10 @@ def insert_at_pos(sol, c, r, pos):
     edges = sol.r[r][R_EDG]
     # old edge
     a, b, arr_a, larr_b = edges.pop(pos)
-    # arrival time to middle
+    # arrival and latest arrival time to middle
     arr_c = max(arr_a + sol.t(a, c), sol.a(c))
-    # latest arrival to middle
     larr_c = min(sol.b(c), larr_b-sol.t(c, b))
+    assert arr_c < larr_c
     # new edges - second then first
     edges.insert(pos, [c, b, arr_c, larr_b])
     edges.insert(pos, [a, c, arr_a, larr_c])
