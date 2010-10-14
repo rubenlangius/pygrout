@@ -12,7 +12,17 @@ from compat import *
 NO_NUMPY = False
 DEBUG_INIT = True
 
+# tuple indices in customer tuple:
+# number, coordinates(X,Y), demand, ready(A), due(B), service time
 ID, X, Y, DEM, A, B, SRV = range(7)
+
+# list indices in route list structure:
+# route len (num edges), capacity, total distance, edge list
+R_LEN, R_CAP, R_DIS, R_EDG = range(4)
+
+# list indices in edge list structure (in route edge list)
+# customer "a" id, customer "b" id, arrival at "a", latest at "b"
+E_FRO, E_TOW, E_ARF, E_LAT = range(4)
 
 class VrptwTask(object):
     """Data loader - holds data of a VRPTW Solomon-formatted instance."""
@@ -52,13 +62,25 @@ class VrptwTask(object):
                 [ elem  + self.cust[j][SRV] for elem in self.dist[j] ]
                  for j in xrange(len(self.dist))
             ]
+            
     def checkRoute(self, route):
         """Displays a route summary."""
-        prev, arr, dist = 0, 0.0, 0.0
-        for next in route:
-            n_arr = max(arr+self.time[prev][next], self.cust[next][A])
-            print self.cust[next], n_arr, dist
-            prev, arr, dist = next, n_arr, dist + self.dist[prev][next]
+        cap, dist = 0.0, 0.0
+        print "Route:"
+        for a, b, aa, lab in route[R_EDG]:
+            print ("From %2d(%2d,%3d) to %2d(%4d,%4d): "
+                   "start(%.2f)+svc(%d)+dist(%5.2f)=startb(%.2f);ltst(%.2f)"
+                   % (a, self.cust[a][A], self.cust[a][B],
+                      b, self.cust[b][A], self.cust[b][B],
+                      aa, self.cust[a][SRV], self.dist[a][b],
+                      aa + self.cust[a][SRV] + self.dist[a][b], lab) )
+            if lab < aa + self.cust[a][SRV] + self.dist[a][b]:
+                print "!"*70
+            cap += self.cust[a][DEM]
+            dist += self.dist[a][b]
+            print "  Dist now %.2f, load now %.2f" % (dist, cap)
+        print "Route stored dist %.2f, load %.2f" % (route[R_DIS], route[R_CAP])
+
             
 def error(msg):
     """A function to print or suppress errors."""
@@ -122,15 +144,11 @@ class VrptwSolution(object):
     def check_full(self):
         """Check full solution - shorthand method."""
         return self.check(True)
+
         
 
 class UndoStack(object):
     """Holds description of a sequence of operations, possibly separated by checkpoints."""
-
-# route    
-R_LEN, R_CAP, R_DIS, R_EDG = range(4)
-# customer
-E_FRO, E_TOW, E_ARF, E_LAT = range(4)
 
 def insert_new(sol, c):
     """Inserts customer C on a new route."""
@@ -222,8 +240,11 @@ def build_first(sol, sortkey = lambda c: c[B]-c[A]):
     """Greedily construct the first solution."""
     for c in sorted(sol.task.cust[1:], key=sortkey):
         insert_customer(sol, c[ID])
-        pprint.pprint(sol.r[min(2,len(sol.r)-1)][R_EDG])
         if not sol.check():
+            for r in xrange(len(sol.r)):
+                print r
+                sol.task.checkRoute(sol.r[r])
+                print "-"*20
             exit()
     
 def test_initial_sorting(test):
@@ -239,8 +260,6 @@ def test_initial_sorting(test):
     results = [ (sol.k, sol.dist) for sol in s ]
     best = map(lambda x: x[1], sorted(zip(results, range(1,4))))
     print task.name, results, best 
-    s[0].check()
-    pprint.pprint(s[0].r[11])
     
 def test_initial_creation(test):
     global DEBUG_INIT
@@ -259,7 +278,7 @@ def main():
     else:
         test = sys.argv[1]
         
-    test_initial_sorting(test)
+    test_initial_creation(test)
 
 if __name__=='__main__':
     main()
