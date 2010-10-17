@@ -53,20 +53,57 @@ class UndoStack(object):
 
     def undo(self, checkpoint = None):
         """Reverse all operation performed through this stack, or up to a checkpoint."""
+        assert checkpoint <= self.point, 'Undo to invalid checkpoint'
         while len(self.actions):
             tag, args = self.actions.pop()
             if tag == U_CHECKPOINT and args == checkpoint:
+                self.point = checkpoint-1 
                 break
             else:
                 print tag, args
                 handlers[tag](*args)
                 
+class TestUndoStack(object):
+    """Unit test class for py.test"""
+    def setup_class(self):
+        """Create the UndoStack used with every test and an example list."""
+        self.u = UndoStack()
+        self.l_orig = [7, 'dolorem', 4, None, 5.3]
+        self.l = self.l_orig[:]
+        
+    def setup_method(self, method):
+        """Restore the example list, not needed if tests pass, undo does it."""
+        # self.l = self.l_orig[:]
+                
+    def test_ins(self):
+        """Undoing an insertion."""
+        self.u.ins(self.l, 0, 2)
+        expected = [2]+self.l_orig
+        assert self.l == expected
+        self.u.undo()
+        assert self.l == self.l_orig
             
-if __name__=='__main__':
-    """Later to appear here (or in a different file): unit tests."""
-    u = UndoStack()
-    l = []
-    u.ins(l, 0, 2)
-    print l
-    u.undo()
-    print l
+    def test_pop(self):
+        out = self.u.pop(self.l, 2)
+        assert out == 4
+        self.u.undo()
+        assert self.l == self.l_orig
+        
+    def test_set(self):
+        self.u.set(self.l, 1, 'ipsum')
+        assert self.l[1] == 'ipsum'
+        self.u.undo()
+        assert self.l == self.l_orig
+
+    def test_sequence(self):
+        self.u.pop(self.l, 3)
+        self.u.ins(self.l, 3, 123)
+        tag = self.u.checkpoint()
+        l_on_check = self.l[:]
+        self.u.set(self.l, 0, 0)
+        self.u.pop(self.l, 0)
+        self.u.undo(tag)
+        assert l_on_check == self.l
+        self.u.undo()
+        assert self.l == self.l_orig
+        
