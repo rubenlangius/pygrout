@@ -1,4 +1,18 @@
+from consts import *
 
+def pairs(iterable):
+    """A generator for adjacent elements of an iterable."""
+    it = iter(iterable)
+    prev = it.next()
+    for next in it:
+        yield (prev, next)
+        prev = next
+
+def test_pairs():
+    """Unit test for pairs() generator."""
+    for actual, expected in zip(pairs(range(5)), [(i, i+1) for i in range(4)]):
+        assert actual == expected
+        
 def solution_header(sol):
     """   
     The Czarnas' code features a 'routeCostMultipiler', which is used like this: 
@@ -39,8 +53,42 @@ def print_like_Czarnas(sol):
 
 def print_like_Czarnas_long(sol):
     """Prints a verbose description of the solution (one line per customer).
-    Compatible with the printSolutionAllData() method in the reference code"""
+    Compatible with the printSolutionAllData() method in the reference code
+
+            DATATYPE dist = data.getDistance(DEPOT, getRouteStart(r));
+            for (int c = getRouteStart(r); c != DEPOT; c = cust[c].getNext()) {
+                initCap -= TO_FLOAT(data.getDemand(c));
+                fprintf(output, "(%2d, %7.2f, %7.2f, %7.2f, %7.2f, %5.2f, %6.2f, %6.2f, %4.1f)\n", c,
+                        TO_FLOAT(cust[c].getArrival()),
+                        TO_FLOAT(cust[c].getLatestArrival()),
+                        TO_FLOAT(data.getBeginTime(c)), TO_FLOAT(data.getEndTime(c)),
+                        TO_FLOAT(data.getServiceTime(c)),
+                        TO_FLOAT(data.getDistance(cust[c].getPrev(), c)), initCap,
+                        TO_FLOAT(data.getDemand(c)));
+                if (initCap > TO_FLOAT(data.getVehicleCapacity()) || initCap < 0.0)
+                    fprintf(output, "************* vehicle capacity violated!!!\n");
+                dist += data.getDistance(c, cust[c].getNext());
+            }
+    """
     result = solution_header(sol)
+    
+    for rt, num in zip(sol.r, count(1)):
+        result += (
+            "Route: %d\nRoute length: %d\nRoute cost: %.3f\n"
+            "Init capacity: %.2f, max capacity = %.2f\n" %
+            (num, rt[R_LEN], rt[R_DIS], rt[R_CAP], rt[R_CAP]) +
+            "Route \n"
+            "(cust, arriv, ltstArr, bgnWind, endWind, srvcT, dstPrv, weight, dem):\n"
+            " ------------------------------------------------------------------\n"
+            )
+        wgt = 0
+        for bef, aft in pairs(rt[R_EDG]):
+            cust = bef[E_TOW] 
+            result += (
+                "(%2d, %7.2f, %7.2f, %7.2f, %7.2f, %5.2f, %6.2f, %6.2f, %4.1f)\n" %
+                 ( cust, aft[E_ARF], bef[E_LAT], sol.a(cust), sol.b(cust),
+                  sol.svc(cust), sol.d(bef[E_FRO], cust), wgt, sol.dem(cust) )
+                )
     print result
 
 def symbol(i):

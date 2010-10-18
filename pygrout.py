@@ -7,22 +7,10 @@ import sys
 import operator
 
 # additional modules
+from consts import *
 from compat import *
 
-NO_NUMPY = False
-DEBUG_INIT = False
-
-# tuple indices in customer tuple:
-# number, coordinates(X,Y), demand, ready(A), due(B), service time
-ID, X, Y, DEM, A, B, SRV = range(7)
-
-# list indices in route list structure:
-# route len (num edges), capacity, total distance, edge list
-R_LEN, R_CAP, R_DIS, R_EDG = range(4)
-
-# list indices in edge list structure (in route edge list)
-# customer "a" id, customer "b" id, arrival at "a", latest at "b"
-E_FRO, E_TOW, E_ARF, E_LAT = range(4)
+from undo import UndoStack
 
 class VrptwTask(object):
     """Data loader - holds data of a VRPTW Solomon-formatted instance."""
@@ -146,7 +134,7 @@ class VrptwSolution(object):
     
 def insert_new(sol, c):
     """Inserts customer C on a new route."""
-    sol.r.append( [
+    new_route = [
         2,                # number of edges
         sol.dem(c),       # demand on route 
         sol.d(0,c)+sol.d(c,0), # distance there and back
@@ -154,7 +142,8 @@ def insert_new(sol, c):
             [0, c,                         0, sol.b(c)], # depot -> c
             [c, 0, max(sol.t(0,c), sol.a(c)), sol.b(0)]  # c -> depot
         ]
-    ] )
+    ]
+    sol.r.append(new_route)
     sol.k += 1                   # route no inc
     sol.dist += sol.r[-1][R_DIS] # total distance inc
 
@@ -260,7 +249,7 @@ def test_initial_creation(test):
     s = VrptwSolution(VrptwTask(test))
     DEBUG_INIT = True
     build_first(s)
-    print_like_Czarnas(s)    
+    print_like_Czarnas_long(s)    
     
 def main():
     """Entry point when this module is ran at top-level.
