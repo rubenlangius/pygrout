@@ -8,13 +8,16 @@ def undo_pop(list_, idx, val):
 
 def undo_set(list_, idx, val):
     list_[idx] = val
-        
+
+def undo_atr(obj, atr, val):
+    setattr(obj, atr, val)
+    
 # undo elements type:
 # edge inserted, edge removed
-U_ELEM_IN, U_ELEM_OUT, U_ELEM_MOD, U_CHECKPOINT = range(4)
+U_ELEM_IN, U_ELEM_OUT, U_ELEM_MOD, U_ATTRIB, U_CHECKPOINT = range(5)
 
 # undo mapping
-handlers = [ undo_ins, undo_pop, undo_set ]
+handlers = [ undo_ins, undo_pop, undo_set, setattr ]
 
 class UndoStack(object):
     """Holds description of a sequence of operations, possibly separated by checkpoints."""
@@ -39,13 +42,20 @@ class UndoStack(object):
         self.actions.append( (U_ELEM_MOD, (list_, idx, list_[idx])) )
         list_[idx] = value
         return value
-
+    
     def checkpoint(self):
         """Marks current state and returns the marker."""
         self.point += 1
         self.actions.append( (U_CHECKPOINT, self.point) )
         return self.point
     
+    def atr(self, obj, atr, val):
+        """Change an object's attribute."""
+        data = getattr(obj, atr)
+        self.actions.append( (U_ATTRIB, (obj, atr, data)) )
+        setattr(obj, atr, val)
+        return val
+
     def commit(self):
         """Forget all undo information."""
         self.actions = []
@@ -107,3 +117,9 @@ class TestUndoStack(object):
         self.u.undo()
         assert self.l == self.l_orig
         
+    def test_atr(self):
+        self.color = 'red'
+        self.u.atr(self, 'color', 'blue')
+        assert self.color == 'blue'
+        self.u.undo()
+        assert self.color == 'red'
