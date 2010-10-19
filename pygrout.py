@@ -228,6 +228,7 @@ def build_first(sol, sortkey = lambda c: c[B]-c[A]):
                 print r
                 sol.task.checkRoute(sol.r[r])
                 print "-"*20
+            print_like_Czarnas_long(sol)
             exit()
     
 def test_initial_sorting(test):

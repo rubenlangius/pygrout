@@ -1,4 +1,5 @@
 from consts import *
+from itertools import count
 
 def pairs(iterable):
     """A generator for adjacent elements of an iterable."""
@@ -87,8 +88,9 @@ def print_like_Czarnas_long(sol):
             result += (
                 "(%2d, %7.2f, %7.2f, %7.2f, %7.2f, %5.2f, %6.2f, %6.2f, %4.1f)\n" %
                  ( cust, aft[E_ARF], bef[E_LAT], sol.a(cust), sol.b(cust),
-                  sol.svc(cust), sol.d(bef[E_FRO], cust), wgt, sol.dem(cust) )
+                  sol.task.cust[cust][SRV], sol.d(bef[E_FRO], cust), wgt, sol.dem(cust) )
                 )
+        result += "\n"
     print result
 
 def symbol(i):
