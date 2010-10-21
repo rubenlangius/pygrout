@@ -73,6 +73,11 @@ class UndoStack(object):
                 print tag, args
                 handlers[tag](*args)
                 
+    def undo_last(self):
+        """Rollback actions to last checkpoint."""
+        assert self.point > 0, 'No actions to undo'
+        self.undo(self.point)
+        
 class TestUndoStack(object):
     """Unit test class for py.test"""
     def setup_class(self):

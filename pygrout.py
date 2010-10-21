@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 from math import hypot
-from itertools import count, izip
+from itertools import count, izip, dropwhile
 import pprint
 import sys
 import operator
@@ -11,6 +11,9 @@ from consts import *
 from compat import *
 
 from undo import UndoStack
+
+u = UndoStack()
+"""Global undo - may be later made possible to override."""
 
 class VrptwTask(object):
     """Data loader - holds data of a VRPTW Solomon-formatted instance."""
@@ -51,7 +54,7 @@ class VrptwTask(object):
                  for j in xrange(len(self.dist))
             ]
             
-    def checkRoute(self, route):
+    def routeInfo(self, route):
         """Displays a route summary."""
         cap, dist = 0.0, 0.0
         print "Route:"
@@ -98,40 +101,44 @@ class VrptwSolution(object):
         """Checks solution, possibly partial, for inconsistency."""
         unserviced = set(range(1, self.task.N+1))
         for i in xrange(len(self.r)):
-            now, dist, cap, l = 0, 0, 0, 0
-            for fro, to, afro, lato in self.r[i][R_EDG]:
-                actual = max(now, self.a(fro))
-                if afro <> actual:
-                    error("Wrong time: %.2f (expected %.2f, err %.3f) on rt %d"
-                          " edge %d from %d to %d, a(from) %d" 
-                          % (afro, actual, actual-afro, i, l, fro, to, self.a(fro)))
-                    print self.route(i)
-                    return False
-                if fro:
-                    if not fro in unserviced:
-                        error("Customer %d serviced again on route %d" % (fro, i))
-                    else:
-                        unserviced.remove(fro)
-                dist += self.d(fro, to)
-                prevd = self.d(fro, to)
-                cap += self.dem(fro)
-                if cap > self.task.capa:
-                    error("Vehicle capacity exceeded on route %d with customer %d" % (i, fro))
-                l += 1
-                now = actual + self.t(fro, to)
-            if l != self.r[i][R_LEN]:
-                error("Wrong length %d (actual %d) for route %d" % (self.r[i][R_LEN], l, i))
+            if not self.check_route(i, unserviced):
+                return False
         if len(unserviced) and complete:
             error("Unserviced customers left: " + ", ".join(str(x) for x in sorted(unserviced)))
-        print "Check OK"
         return True
     
     def check_full(self):
         """Check full solution - shorthand method."""
         return self.check(True)
 
-
-    
+    def check_route(self, i, unserviced_ = None ):
+        now, dist, cap, l = 0, 0, 0, 0
+        unserviced = unserviced_ or set(range(1, self.task.N+1))
+        for fro, to, afro, lato in self.r[i][R_EDG]:
+            actual = max(now, self.a(fro))
+            if afro <> actual:
+                error("Wrong time: %.2f (expected %.2f, err %.3f) on rt %d"
+                      " edge %d from %d to %d, a(from) %d" 
+                      % (afro, actual, actual-afro, i, l, fro, to, self.a(fro)))
+                error(self.route(i))
+                return False
+            if fro:
+                if not fro in unserviced:
+                    error("Customer %d serviced again on route %d" % (fro, i))
+                else:
+                    unserviced.remove(fro)
+            dist += self.d(fro, to)
+            cap += self.dem(fro)
+            if cap > self.task.capa:
+                error("Vehicle capacity exceeded on route %d with customer %d" % (i, fro))
+                return False
+            l += 1
+            now = actual + self.t(fro, to)
+        if l != self.r[i][R_LEN]:
+            error("Wrong length %d (actual %d) for route %d" % (self.r[i][R_LEN], l, i))
+            return False
+        return True
+        
 def insert_new(sol, c):
     """Inserts customer C on a new route."""
     new_route = [
@@ -143,37 +150,42 @@ def insert_new(sol, c):
             [c, 0, max(sol.t(0,c), sol.a(c)), sol.b(0)]  # c -> depot
         ]
     ]
-    sol.r.append(new_route)
-    sol.k += 1                   # route no inc
-    sol.dist += sol.r[-1][R_DIS] # total distance inc
+    u.ins(sol.r, sol.k, new_route)
+    u.atr(sol, 'k', sol.k+1)                      # route no inc
+    u.atr(sol, 'dist', sol.dist+new_route[R_DIS]) # total distance inc
 
 def insert_at_pos(sol, c, r, pos):
     """Inserts c into route ad pos. Does no checks."""
     # update edges (with arival times)
     edges = sol.r[r][R_EDG]
     # old edge
-    a, b, arr_a, larr_b = edges.pop(pos)
+    a, b, arr_a, larr_b = u.pop(edges, pos)
     # arrival and latest arrival time to middle
     arr_c = max(arr_a + sol.t(a, c), sol.a(c))
     larr_c = min(sol.b(c), larr_b-sol.t(c, b))
     assert arr_c < larr_c
     # new edges - second then first
-    edges.insert(pos, [c, b, arr_c, larr_b])
-    edges.insert(pos, [a, c, arr_a, larr_c])
+    u.ins(edges, pos, [c, b, arr_c, larr_b])
+    u.ins(edges, pos, [a, c, arr_a, larr_c])
+
     # propagate time window constraints - forward
-    prev_arr, prev  = arr_c + sol.t(c, b), c
-    for i in range(pos+2, len(edges)):
+    prev_arr  = arr_c + sol.t(c, b)
+    for i in range(pos+2, len(edges)): # starts with (b, x, arr_b, larr_x)
         p, n, arr, larr = edges[i]
         if prev_arr < arr: # first wait for time window
             break
-        edges[i][E_ARF], prev_arr, prev = prev_arr, prev_arr+sol.t(prev, p), p
+        u.set(edges[i], E_ARF, prev_arr)
+        prev_arr = prev_arr+sol.t(p, n)
+
     # propagate time window constraints - backward
     next_larr, next = larr_c - sol.t(a,c), c
     for i in range(pos-1, -1, -1):
         p, n, arr, larr = edges[i]
         if next_larr > larr: # first early close
             break
-        edges[i][E_LAT], next_larr, next = next_larr, next_larr-sol.t(n, next), n
+        u.set(edges[i], E_LAT, next_larr)
+        next_larr, next = next_larr-sol.t(n, next), n
+
     # update distances
     dinc = sol.d(a, c)+sol.d(c, b)-sol.d(a, b)
     sol.r[r][R_DIS] += dinc
@@ -191,8 +203,10 @@ def find_bestpos_on(sol, c, r):
         return None, None
     # check route edges
     for (a, b, arr_a, larr_b), i in izip(sol.r[r][R_EDG], count()):
-        arr_c = max(arr_a + sol.t(a, c), sol.a(c))
-        if  arr_c <= sol.b(c) and arr_c + sol.t(c, b) <= larr_b:
+        arr_c = max(arr_a + sol.t(a, c), sol.a(c)) # earliest possible
+        larr_c = min(sol.b(c), larr_b-sol.t(c, b)) # latest if c WAS here
+        larr_a = min(sol.b(a), larr_c-sol.t(a, c))
+        if  arr_c <= larr_c and arr_a <= larr_a:
             distinc = -(sol.d(a, c) + sol.d(c, b) - sol.d(a, b))
             if mininc < distinc:
                 pos, mininc = i, distinc
@@ -224,12 +238,16 @@ def build_first(sol, sortkey = lambda c: c[B]-c[A]):
     for c in sorted(sol.task.cust[1:], key=sortkey):
         insert_customer(sol, c[ID])
         if not sol.check():
-            for r in xrange(len(sol.r)):
-                print r
-                sol.task.checkRoute(sol.r[r])
-                print "-"*20
-            print_like_Czarnas_long(sol)
+            badroute = dropwhile(lambda x: sol.check_route(x), xrange(len(sol.r))).next()
+            print "Bad route:", badroute
+            sol.task.routeInfo(sol.r[badroute])
+            u.undo_last()
+            print "----\n"*3, "Was before:"
+            sol.task.routeInfo(sol.r[badroute])
             exit()
+        u.checkpoint()
+    print_like_Czarnas_long(sol)
+        
     
 def test_initial_sorting(test):
     sorters = [ 
@@ -246,11 +264,10 @@ def test_initial_sorting(test):
     print task.name, results, best 
     
 def test_initial_creation(test):
-    global DEBUG_INIT
+    #global DEBUG_INIT
     s = VrptwSolution(VrptwTask(test))
     DEBUG_INIT = True
     build_first(s)
-    print_like_Czarnas_long(s)    
     
 def main():
     """Entry point when this module is ran at top-level.
