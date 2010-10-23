@@ -5,9 +5,9 @@ def pairs(iterable):
     """A generator for adjacent elements of an iterable."""
     it = iter(iterable)
     prev = it.next()
-    for next in it:
-        yield (prev, next)
-        prev = next
+    for next_ in it:
+        yield (prev, next_)
+        prev = next_
 
 def test_pairs():
     """Unit test for pairs() generator."""

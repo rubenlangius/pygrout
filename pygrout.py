@@ -2,9 +2,10 @@
 
 from math import hypot
 from itertools import count, izip, dropwhile
-import pprint
 import sys
-import operator
+
+# for imports in some environments
+sys.path.append('.')
 
 # additional modules
 from consts import *
@@ -163,7 +164,7 @@ def insert_at_pos(sol, c, r, pos):
     # arrival and latest arrival time to middle
     arr_c = max(arr_a + sol.t(a, c), sol.a(c))
     larr_c = min(sol.b(c), larr_b-sol.t(c, b))
-    assert arr_c < larr_c
+    assert arr_c <= larr_c
     # new edges - second then first
     u.ins(edges, pos, [c, b, arr_c, larr_b])
     u.ins(edges, pos, [a, c, arr_a, larr_c])
@@ -246,10 +247,8 @@ def build_first(sol, sortkey = lambda c: c[B]-c[A]):
             sol.task.routeInfo(sol.r[badroute])
             exit()
         u.checkpoint()
-    print_like_Czarnas_long(sol)
-        
     
-def test_initial_sorting(test):
+def check_initial_sorting(test):
     sorters = [ 
                lambda x: x[B]-x[A], # ascending TW
                lambda x: x[A]-x[B], # descending TW
@@ -263,11 +262,22 @@ def test_initial_sorting(test):
     best = map(lambda x: x[1], sorted(zip(results, range(1,4))))
     print task.name, results, best 
     
-def test_initial_creation(test):
-    #global DEBUG_INIT
-    s = VrptwSolution(VrptwTask(test))
-    DEBUG_INIT = True
-    build_first(s)
+def test_initial_creation():
+    """Unit test for creating solutions to all included benchmarks."""
+    def check_one(test):
+        s = VrptwSolution(VrptwTask(test))
+        build_first(s)
+        assert s.check()==True, 'Benchmark %s failed at initial solution' % test
+    from glob import iglob
+    from itertools import chain
+    completed = 0
+    # Homberger's are too heavy
+    # tests = chain(iglob("solomons/*.txt"), iglob('hombergers/*.txt'))
+    tests = iglob("solomons/*.txt")
+    for test in tests:
+        yield check_one, test
+        completed += 1
+    assert completed == 56, 'Wrong number of checked benchmarks'
     
 def main():
     """Entry point when this module is ran at top-level.
@@ -279,7 +289,7 @@ def main():
     else:
         test = sys.argv[1]
         
-    test_initial_creation(test)
+    test_initial_creation()
 
 if __name__=='__main__':
     main()
