@@ -189,12 +189,12 @@ def insert_at_pos(sol, c, r, pos):
 
     # update distances
     dinc = sol.d(a, c)+sol.d(c, b)-sol.d(a, b)
-    sol.r[r][R_DIS] += dinc
-    sol.dist += dinc
+    u.add(sol.r[r], R_DIS, dinc)
+    u.ada(sol, 'dist', dinc)
     # update capacity
-    sol.r[r][R_CAP] += sol.dem(c)
+    u.add(sol.r[r], R_CAP, sol.dem(c))
     # update count
-    sol.r[r][R_LEN] += 1
+    u.add(sol.r[r], R_LEN, 1)
 
 def find_bestpos_on(sol, c, r):
     """Finds best position to insert customer on existing route."""
@@ -234,18 +234,39 @@ def insert_customer(sol, c):
             if DEBUG_INIT:
                 print c, ">new", len(sol.r)-1
 
+def remove_customer(sol, r, pos):
+    """Remove customer at pos from a route and return his ID."""
+    edges = sol.r[r][R_EDG]
+    assert pos < sol.r[r][R_LEN]
+    a, b, arr_a, larr_b = u.pop(edges, pos)
+    d, c, arr_b, larr_c = u.pop(edges, pos)
+    assert b == d
+    u.ins(edges, pos, [a, c, arr_a, larr_c])
+
+    # update distances (probably decrease)
+    dinc = sol.d(a, c)-sol.d(a, b)-sol.d(b, c)
+    u.add(sol.r[r], R_DIS, dinc)
+    u.ada(sol, 'dist', dinc)
+    # update capacity
+    u.add(sol.r[r], R_CAP, -sol.dem(b))
+    # update count
+    u.add(sol.r[r], R_LEN, -1)
+
+def solution_diag(sol):
+    if not sol.check():
+        badroute = dropwhile(lambda x: sol.check_route(x), xrange(len(sol.r))).next()
+        print "Bad route:", badroute
+        sol.task.routeInfo(sol.r[badroute])
+        u.undo_last()
+        print "----\n"*3, "Was before:"
+        sol.task.routeInfo(sol.r[badroute])
+        exit()
+    
 def build_first(sol, sortkey = lambda c: c[B]-c[A]):
     """Greedily construct the first solution."""
     for c in sorted(sol.task.cust[1:], key=sortkey):
         insert_customer(sol, c[ID])
-        if not sol.check():
-            badroute = dropwhile(lambda x: sol.check_route(x), xrange(len(sol.r))).next()
-            print "Bad route:", badroute
-            sol.task.routeInfo(sol.r[badroute])
-            u.undo_last()
-            print "----\n"*3, "Was before:"
-            sol.task.routeInfo(sol.r[badroute])
-            exit()
+        assert sol.check()
         u.checkpoint()
     
 def check_initial_sorting(test):

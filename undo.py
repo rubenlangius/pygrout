@@ -11,13 +11,19 @@ def undo_set(list_, idx, val):
 
 def undo_atr(obj, atr, val):
     setattr(obj, atr, val)
+
+def undo_add(list_, idx, val):
+    list_[idx] -= val
+
+def undo_ada(obj, atr, val):
+    setattr(obj, atr, getattr(obj, atr) - val)
     
 # undo elements type:
-# edge inserted, edge removed
-U_ELEM_IN, U_ELEM_OUT, U_ELEM_MOD, U_ATTRIB, U_CHECKPOINT = range(5)
+# 
+U_ELEM_IN, U_ELEM_OUT, U_ELEM_MOD, U_ATTRIB, U_ADD, U_ADA, U_CHECKPOINT = range(7)
 
 # undo mapping
-handlers = [ undo_ins, undo_pop, undo_set, setattr ]
+handlers = [ undo_ins, undo_pop, undo_set, setattr, undo_add, undo_ada ]
 
 class UndoStack(object):
     """Holds description of a sequence of operations, possibly separated by checkpoints."""
@@ -55,6 +61,18 @@ class UndoStack(object):
         self.actions.append( (U_ATTRIB, (obj, atr, data)) )
         setattr(obj, atr, val)
         return val
+
+    def add(self, list_, idx, value):
+        """Inplace add something to list element."""
+        self.actions.append( (U_ADD, (list_, idx, value)) )
+        list_[idx] += value
+
+    def ada(self, obj, atr, val):
+        """Inplace add to object's attribute."""
+        data = getattr(obj, atr)
+        self.actions.append( (U_ADA, (obj, atr, val)) )
+        setattr(obj, atr, val+data)
+        return val+data
 
     def commit(self):
         """Forget all undo information."""
