@@ -84,9 +84,10 @@ class UndoStack(object):
         assert checkpoint <= self.point, 'Undo to invalid checkpoint'
         while len(self.actions):
             tag, args = self.actions.pop()
-            if tag == U_CHECKPOINT and args == checkpoint:
-                self.point = checkpoint-1 
-                break
+            if tag == U_CHECKPOINT:
+                if args == checkpoint:
+                    self.point = checkpoint-1 
+                    break
             else:
                 # print tag, args
                 handlers[tag](*args)
