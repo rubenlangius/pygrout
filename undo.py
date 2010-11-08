@@ -88,7 +88,7 @@ class UndoStack(object):
                 self.point = checkpoint-1 
                 break
             else:
-                print tag, args
+                # print tag, args
                 handlers[tag](*args)
                 
     def undo_last(self):

@@ -24,7 +24,10 @@ class VrptwTask(object):
         self.Kmax, self.capa = map(int, lines[4].split())
         self.cust = [ tuple(map(int, x.split())) for x in lines[9:] ]
         self.N = len(self.cust)-1
-        # Computed stuff
+        self.precompute()
+        
+    def precompute(self):
+        """Initialize or update computed members: distances and times."""
         try:
             # numpy version - faster! 
             if NO_NUMPY:
@@ -86,6 +89,9 @@ class VrptwSolution(object):
         self.r = []
         self.dist = 0.
         self.k = 0
+    def val(self):
+        """Return a tuple to represent the solution value; less is better."""
+        return (self.k, self.dist)
     def d(self, a, b):
         return self.task.dist[a][b]
     def t(self, a, b):
@@ -236,11 +242,17 @@ def insert_customer(sol, c):
 
 def remove_customer(sol, r, pos):
     """Remove customer at pos from a route and return his ID."""
-    edges = sol.r[r][R_EDG]
     assert pos < sol.r[r][R_LEN]
+    edges = sol.r[r][R_EDG]
     a, b, arr_a, larr_b = u.pop(edges, pos)
     d, c, arr_b, larr_c = u.pop(edges, pos)
     assert b == d
+    
+    if sol.r[r][R_LEN] == 2: # last customer - remove route
+        u.pop(sol.r, r)
+        return b
+
+    assert arr_a + sol.t(a, c) < larr_c
     u.ins(edges, pos, [a, c, arr_a, larr_c])
 
     # update distances (probably decrease)
@@ -251,6 +263,7 @@ def remove_customer(sol, r, pos):
     u.add(sol.r[r], R_CAP, -sol.dem(b))
     # update count
     u.add(sol.r[r], R_LEN, -1)
+    return b
 
 def solution_diag(sol):
     if not sol.check():
@@ -290,17 +303,43 @@ def test_initial_creation():
         build_first(s)
         assert s.check()==True, 'Benchmark %s failed at initial solution' % test
     from glob import iglob
-    from itertools import chain
+
     completed = 0
     # Homberger's are too heavy
+    # from itertools import chain
     # tests = chain(iglob("solomons/*.txt"), iglob('hombergers/*.txt'))
     tests = iglob("solomons/*.txt")
     for test in tests:
         yield check_one, test
         completed += 1
     assert completed == 56, 'Wrong number of checked benchmarks'
-    
-def main():
+
+def test_undo_at_creation():
+    pass
+
+def local_search(sol):
+    """Optimize solution by local search."""
+    from random import Random
+    randint = Random().randint
+    u.commit()
+    oldval = sol.val()
+    for j in xrange(20):
+        for x in xrange(1000):
+            
+            r = randint(0, sol.k-1)
+            # _, r = min( (sol.r[i][R_LEN], i) for i in xrange(sol.k) )
+            pos = randint(0, sol.r[r][R_LEN]-2)
+            c = remove_customer(sol, r, pos)  
+            insert_customer(sol, c)
+            if sol.val() < oldval:
+                print "From", oldval, "to", sol.val()
+                oldval = sol.val()
+                u.commit()
+            else:
+                u.undo()
+        print sol.val()
+            
+def main():    
     """Entry point when this module is ran at top-level.
     This function may change, testing some current new functionality."""
     test = 'solomons/c101.txt'
@@ -310,7 +349,9 @@ def main():
     else:
         test = sys.argv[1]
         
-    test_initial_creation()
+    sol = VrptwSolution(VrptwTask(test))
+    build_first(sol)
+    local_search(sol)
 
 if __name__=='__main__':
     main()
