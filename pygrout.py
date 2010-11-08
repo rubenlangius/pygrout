@@ -161,6 +161,14 @@ def insert_new(sol, c):
     u.atr(sol, 'k', sol.k+1)                      # route no inc
     u.atr(sol, 'dist', sol.dist+new_route[R_DIS]) # total distance inc
 
+def propagate_deadline(sol, r, pos):
+    """Update deadlines on a route preceding pos."""
+    # TODO: implement, make insert_... and remove_... use it.
+    
+def propagate_arrival(sol, r, pos):
+    """Update arrivals on a route after pos."""
+    # TODO: implement, make insert_... and remove_... use it.
+
 def insert_at_pos(sol, c, r, pos):
     """Inserts c into route ad pos. Does no checks."""
     # update edges (with arival times)
@@ -175,6 +183,7 @@ def insert_at_pos(sol, c, r, pos):
     u.ins(edges, pos, [c, b, arr_c, larr_b])
     u.ins(edges, pos, [a, c, arr_a, larr_c])
 
+    # TODO: move to propagate_...
     # propagate time window constraints - forward
     prev_arr  = arr_c + sol.t(c, b)
     for i in range(pos+2, len(edges)): # starts with (b, x, arr_b, larr_x)
@@ -184,6 +193,7 @@ def insert_at_pos(sol, c, r, pos):
         u.set(edges[i], E_ARF, prev_arr)
         prev_arr = prev_arr+sol.t(p, n)
 
+    # TODO: move to propagate_...
     # propagate time window constraints - backward
     next_larr, next = larr_c - sol.t(a,c), c
     for i in range(pos-1, -1, -1):
@@ -218,7 +228,14 @@ def find_bestpos_on(sol, c, r):
             if mininc < distinc:
                 pos, mininc = i, distinc
     return mininc, pos
+
+def find_bestpos(sol, c):
+    """Find best positions on any route, return the route pos and distance.
     
+    The exact format is a nested tuple: ((-distance increase, position), route)"""
+    return max((find_bestpos_on(sol, c, rn), rn) for rn in xrange(len(sol.r)))
+
+# TODO: maybe return where we finally inserted him
 def insert_customer(sol, c):
     """Insert customer at best position or new route."""
     if not len(sol.r):
@@ -227,8 +244,7 @@ def insert_customer(sol, c):
                 print c, ">new", len(sol.r)-1
     else:
         # best distinc, best pos, best route
-        (bd, bp), br = max(
-            (find_bestpos_on(sol, c, rn), rn) for rn in xrange(len(sol.r)) )
+        (bd, bp), br = find_bestpos(sol, c)
         # found some route to insert
         if not bd is None:
             insert_at_pos(sol, c, br, bp)
@@ -249,11 +265,17 @@ def remove_customer(sol, r, pos):
     assert b == d
     
     if sol.r[r][R_LEN] == 2: # last customer - remove route
-        u.pop(sol.r, r)
+        rt = u.pop(sol.r, r)
+        # solution route count decrease
+        u.ada(sol, 'k', -1)
+        # solution distance decrease
+        u.ada(sol, 'dist', -rt[R_DIS])
         return b
 
     assert arr_a + sol.t(a, c) < larr_c
     u.ins(edges, pos, [a, c, arr_a, larr_c])
+
+    # TODO: use propagate_... to update edges, FIXME
 
     # update distances (probably decrease)
     dinc = sol.d(a, c)-sol.d(a, b)-sol.d(b, c)
@@ -323,9 +345,9 @@ def local_search(sol):
     randint = Random().randint
     u.commit()
     oldval = sol.val()
-    for j in xrange(20):
+    for j in xrange(20): # thousands of iterations
         for x in xrange(1000):
-            
+            u.checkpoint()
             r = randint(0, sol.k-1)
             # _, r = min( (sol.r[i][R_LEN], i) for i in xrange(sol.k) )
             pos = randint(0, sol.r[r][R_LEN]-2)
@@ -333,7 +355,11 @@ def local_search(sol):
             insert_customer(sol, c)
             if sol.val() < oldval:
                 print "From", oldval, "to", sol.val()
+                print r, pos, c
+                solution_diag(sol)
                 oldval = sol.val()
+                if not sol.check():
+                    print "ERR"
                 u.commit()
             else:
                 u.undo()
