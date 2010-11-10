@@ -161,12 +161,24 @@ def insert_new(sol, c):
     u.atr(sol, 'k', sol.k+1)                      # route no inc
     u.atr(sol, 'dist', sol.dist+new_route[R_DIS]) # total distance inc
 
-def propagate_deadline(sol, r, pos):
-    """Update deadlines on a route preceding pos."""
-    # TODO: implement, make insert_... and remove_... use it.
-    
 def propagate_arrival(sol, r, pos):
+    """Update deadlines on a route preceding pos."""
+    edges = sol.r[r][R_EDG]
+    a, b, arr_a, _ = edges[pos]
+    for idx in xrange(pos+1, len(edges)):
+        b, _, old_arrival, _ = edges[idx]
+        new_arrival = max(arr_a + sol.t(a, b), sol.a(b))
+        # check, if there is a modification
+        if new_arrival == old_arrival:
+            break
+        u.set(edges[idx], E_ARF, new_arrival)
+        a = b
+        arr_a = new_arrival
+        
+    
+def propagate_deadline(sol, r, pos):
     """Update arrivals on a route after pos."""
+    edges = sol.r[r][R_EDG]
     # TODO: implement, make insert_... and remove_... use it.
 
 def insert_at_pos(sol, c, r, pos):
@@ -183,15 +195,15 @@ def insert_at_pos(sol, c, r, pos):
     u.ins(edges, pos, [c, b, arr_c, larr_b])
     u.ins(edges, pos, [a, c, arr_a, larr_c])
 
-    # TODO: move to propagate_...
     # propagate time window constraints - forward
-    prev_arr  = arr_c + sol.t(c, b)
-    for i in range(pos+2, len(edges)): # starts with (b, x, arr_b, larr_x)
-        p, n, arr, larr = edges[i]
-        if prev_arr < arr: # first wait for time window
-            break
-        u.set(edges[i], E_ARF, prev_arr)
-        prev_arr = prev_arr+sol.t(p, n)
+    # prev_arr  = arr_c + sol.t(c, b)
+    # for i in range(pos+2, len(edges)): # starts with (b, x, arr_b, larr_x)
+    #     p, n, arr, larr = edges[i]
+    #     if prev_arr < arr: # first wait for time window
+    #         break
+    #     u.set(edges[i], E_ARF, prev_arr)
+    #     prev_arr = prev_arr+sol.t(p, n)
+    propagate_arrival(sol, r, pos+1)
 
     # TODO: move to propagate_...
     # propagate time window constraints - backward
@@ -276,6 +288,7 @@ def remove_customer(sol, r, pos):
     u.ins(edges, pos, [a, c, arr_a, larr_c])
 
     # TODO: use propagate_... to update edges, FIXME
+    propagate_arrival(sol, r, pos)
 
     # update distances (probably decrease)
     dinc = sol.d(a, c)-sol.d(a, b)-sol.d(b, c)
@@ -301,7 +314,7 @@ def build_first(sol, sortkey = lambda c: c[B]-c[A]):
     """Greedily construct the first solution."""
     for c in sorted(sol.task.cust[1:], key=sortkey):
         insert_customer(sol, c[ID])
-        assert sol.check()
+        solution_diag(sol)
         u.checkpoint()
     
 def check_initial_sorting(test):
@@ -335,9 +348,6 @@ def test_initial_creation():
         yield check_one, test
         completed += 1
     assert completed == 56, 'Wrong number of checked benchmarks'
-
-def test_undo_at_creation():
-    pass
 
 def local_search(sol):
     """Optimize solution by local search."""
