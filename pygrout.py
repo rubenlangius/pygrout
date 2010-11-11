@@ -162,7 +162,8 @@ def insert_new(sol, c):
     u.atr(sol, 'dist', sol.dist+new_route[R_DIS]) # total distance inc
 
 def propagate_arrival(sol, r, pos):
-    """Update deadlines on a route preceding pos."""
+    """Update arrivals (actual service begin) on a route after pos."""
+    # TODO: make remove_... use it.
     edges = sol.r[r][R_EDG]
     a, b, arr_a, _ = edges[pos]
     for idx in xrange(pos+1, len(edges)):
@@ -177,10 +178,20 @@ def propagate_arrival(sol, r, pos):
         
     
 def propagate_deadline(sol, r, pos):
-    """Update arrivals on a route after pos."""
+    """Update deadlines (latest legal service begin) on a route before pos."""
+    # TODO: check, make insert_... and remove_... use it.
     edges = sol.r[r][R_EDG]
-    # TODO: implement, make insert_... and remove_... use it.
-
+    _, b, _, larr_b = edges[pos]
+    for idx in xrange(pos-1, -1, -1):
+        _, a, _, old_deadline = edges[idx]
+        new_deadline = min(larr_b-sol.t(a, b), sol.b(a))
+        
+        if new_deadline == old_deadline:
+            break
+        u.set(edges[idx], E_LAT, new_deadline)
+        b = a
+        larr_b = new_deadline
+    
 def insert_at_pos(sol, c, r, pos):
     """Inserts c into route ad pos. Does no checks."""
     # update edges (with arival times)
