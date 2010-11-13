@@ -185,7 +185,7 @@ def propagate_deadline(sol, r, pos):
     for idx in xrange(pos-1, -1, -1):
         _, a, _, old_deadline = edges[idx]
         new_deadline = min(larr_b-sol.t(a, b), sol.b(a))
-        
+        # check, if there is a modification
         if new_deadline == old_deadline:
             break
         u.set(edges[idx], E_LAT, new_deadline)
@@ -207,24 +207,10 @@ def insert_at_pos(sol, c, r, pos):
     u.ins(edges, pos, [a, c, arr_a, larr_c])
 
     # propagate time window constraints - forward
-    # prev_arr  = arr_c + sol.t(c, b)
-    # for i in range(pos+2, len(edges)): # starts with (b, x, arr_b, larr_x)
-    #     p, n, arr, larr = edges[i]
-    #     if prev_arr < arr: # first wait for time window
-    #         break
-    #     u.set(edges[i], E_ARF, prev_arr)
-    #     prev_arr = prev_arr+sol.t(p, n)
     propagate_arrival(sol, r, pos+1)
 
-    # TODO: move to propagate_...
     # propagate time window constraints - backward
-    next_larr, next = larr_c - sol.t(a,c), c
-    for i in range(pos-1, -1, -1):
-        p, n, arr, larr = edges[i]
-        if next_larr > larr: # first early close
-            break
-        u.set(edges[i], E_LAT, next_larr)
-        next_larr, next = next_larr-sol.t(n, next), n
+    propagate_deadline(sol, r, pos)
 
     # update distances
     dinc = sol.d(a, c)+sol.d(c, b)-sol.d(a, b)
@@ -264,7 +250,7 @@ def insert_customer(sol, c):
     if not len(sol.r):
         insert_new(sol, c)
         if DEBUG_INIT:
-                print c, ">new", len(sol.r)-1
+            print c, ">new", len(sol.r)-1
     else:
         # best distinc, best pos, best route
         (bd, bp), br = find_bestpos(sol, c)
@@ -298,8 +284,9 @@ def remove_customer(sol, r, pos):
     assert arr_a + sol.t(a, c) < larr_c
     u.ins(edges, pos, [a, c, arr_a, larr_c])
 
-    # TODO: use propagate_... to update edges, FIXME
+    # propagating time window constraints
     propagate_arrival(sol, r, pos)
+    propagate_deadline(sol, r, pos)
 
     # update distances (probably decrease)
     dinc = sol.d(a, c)-sol.d(a, b)-sol.d(b, c)
@@ -367,6 +354,7 @@ def local_search(sol):
     u.commit()
     oldval = sol.val()
     for j in xrange(20): # thousands of iterations
+        value_before_batch = sol.val()
         for x in xrange(1000):
             u.checkpoint()
             r = randint(0, sol.k-1)
@@ -384,7 +372,11 @@ def local_search(sol):
                 u.commit()
             else:
                 u.undo()
-        print sol.val()
+        print oldval
+        if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-6:
+            print "No further changes. Quitting."
+            print_like_Czarnas(sol)
+            break
             
 def main():    
     """Entry point when this module is ran at top-level.
@@ -401,8 +393,13 @@ def main():
     local_search(sol)
 
 if __name__=='__main__':
-    main()
-    
+    try:
+        raise ImportError
+        import profile
+        profile.run('main()')
+    except ImportError:
+        main()
+        
 """
 # BENCHMARK
 import timeit
