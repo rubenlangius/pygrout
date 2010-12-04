@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from math import hypot
+from random import Random
 from itertools import count, izip, dropwhile
 import sys
 
@@ -347,37 +348,43 @@ def test_initial_creation():
         completed += 1
     assert completed == 56, 'Wrong number of checked benchmarks'
 
-def local_search(sol):
+def op_rand_remove_greedy_ins(sol, randint = Random().randint):
+    """Neighbourhood operator - remove random customer and insert back."""
+    # pick a route
+    r = randint(0, sol.k-1)
+    # _, r = min( (sol.r[i][R_LEN], i) for i in xrange(sol.k) )
+    pos = randint(0, sol.r[r][R_LEN]-2)
+    c = remove_customer(sol, r, pos)  
+    insert_customer(sol, c)
+    
+def local_search(sol, oper=op_rand_remove_greedy_ins, ci=u.commit, undo=u.undo):
     """Optimize solution by local search."""
-    from random import Random
-    randint = Random().randint
-    u.commit()
+    ci()
     oldval = sol.val()
     for j in xrange(20): # thousands of iterations
         value_before_batch = sol.val()
         for x in xrange(1000):
-            u.checkpoint()
-            r = randint(0, sol.k-1)
-            # _, r = min( (sol.r[i][R_LEN], i) for i in xrange(sol.k) )
-            pos = randint(0, sol.r[r][R_LEN]-2)
-            c = remove_customer(sol, r, pos)  
-            insert_customer(sol, c)
+            oper(sol)
             if sol.val() < oldval:
-                print "From", oldval, "to", sol.val()
-                print r, pos, c
+                print "From (%d, %.4f) to (%d, %.4f)" % (oldval + sol.val())
                 solution_diag(sol)
                 oldval = sol.val()
                 if not sol.check():
                     print "ERR"
-                u.commit()
+                ci()
             else:
-                u.undo()
+                undo()
         print oldval
         if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-6:
             print "No further changes. Quitting."
-            print_like_Czarnas(sol)
             break
-            
+
+def local_search_filename(filename):
+    sol = VrptwSolution(VrptwTask(filename))
+    build_first(sol)
+    local_search(sol)
+    print_like_Czarnas(sol)
+    
 def main():    
     """Entry point when this module is ran at top-level.
     This function may change, testing some current new functionality."""
@@ -387,10 +394,8 @@ def main():
         sys.stderr.write("usage: %s benchmark_file.txt\nUsing default benchmark: %s\n" % (sys.argv[0], test))
     else:
         test = sys.argv[1]
+    local_search_filename(test)
         
-    sol = VrptwSolution(VrptwTask(test))
-    build_first(sol)
-    local_search(sol)
 
 if __name__=='__main__':
     try:
