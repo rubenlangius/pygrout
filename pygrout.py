@@ -19,8 +19,8 @@ u = UndoStack()
 
 class VrptwTask(object):
     """Data loader - holds data of a VRPTW Solomon-formatted instance."""
-    def __init__(self, filename):
-        lines = open(filename).readlines()
+    def __init__(self, stream):
+        lines = stream.readlines()
         self.name = lines[0].strip()
         self.Kmax, self.capa = map(int, lines[4].split())
         self.cust = [ tuple(map(int, x.split())) for x in lines[9:] ]
@@ -301,7 +301,7 @@ def remove_customer(sol, r, pos):
 
 def solution_diag(sol):
     if not sol.check():
-        badroute = dropwhile(lambda x: sol.check_route(x), xrange(len(sol.r))).next()
+        badroute = dropwhile(sol.check_route, xrange(len(sol.r))).next()
         print "Bad route:", badroute
         sol.task.routeInfo(sol.r[badroute])
         u.undo_last()
@@ -315,6 +315,7 @@ def build_first(sol, sortkey = lambda c: c[B]-c[A]):
         insert_customer(sol, c[ID])
         solution_diag(sol)
         u.checkpoint()
+    u.commit()
     
 def check_initial_sorting(test):
     sorters = [ 
@@ -359,7 +360,6 @@ def op_rand_remove_greedy_ins(sol, randint = Random().randint):
     
 def local_search(sol, oper=op_rand_remove_greedy_ins, ci=u.commit, undo=u.undo):
     """Optimize solution by local search."""
-    ci()
     oldval = sol.val()
     for j in xrange(20): # thousands of iterations
         value_before_batch = sol.val()
@@ -379,8 +379,14 @@ def local_search(sol, oper=op_rand_remove_greedy_ins, ci=u.commit, undo=u.undo):
             print "No further changes. Quitting."
             break
 
-def local_search_filename(filename):
-    sol = VrptwSolution(VrptwTask(filename))
+def command(func):
+    """A command decorator - the decoratee should be a valid command."""
+    return func
+
+@command
+def optimize(args):
+    """Perform optimization of a VRPTW instance according to the arguments."""
+    sol = VrptwSolution(VrptwTask(args.test))
     build_first(sol)
     local_search(sol)
     print_like_Czarnas(sol)
@@ -388,33 +394,18 @@ def local_search_filename(filename):
 def main():    
     """Entry point when this module is ran at top-level.
     This function may change, testing some current new functionality."""
-    test = 'solomons/c101.txt'
-    
-    if len(sys.argv) < 2:
-        sys.stderr.write("usage: %s benchmark_file.txt\nUsing default benchmark: %s\n" % (sys.argv[0], test))
-    else:
-        test = sys.argv[1]
-    local_search_filename(test)
-        
-
-if __name__=='__main__':
     try:
-        raise ImportError
-        import profile
-        profile.run('main()')
+        from argparse import ArgumentParser
+        parser = ArgumentParser(description="Optimizing VRPTW instances with ")
+        # TODO: maybe add first argument (command), like svn, mercurial etc.
+        parser.add_argument("--tkview", action="store_true", help="Display routes on a Tkinter canvas")
+        # TODO: remove -- (optionality) after test period
+        parser.add_argument("--test", type=file, default='solomons/c101.txt')
+        args = parser.parse_args()
+        optimize(args)
     except ImportError:
-        main()
+        print "Install argparse module"
         
-"""
-# BENCHMARK
-import timeit
-t = timeit.Timer(
-    "VrptwTask('hombergers/c110_1.txt')",
-    'from __main__ import VrptwTask'
-)
-t1 = t.timeit(3)/3
-NO_NUMPY = True
-t2 = t.timeit(3)/3
-print t1,t2,t2/t1
-"""
-
+if __name__=='__main__':
+    main()
+    
