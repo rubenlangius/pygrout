@@ -18,7 +18,18 @@ u = UndoStack()
 """Global undo - may be later made possible to override."""
 
 class VrptwTask(object):
-    """Data loader - holds data of a VRPTW Solomon-formatted instance."""
+    """Data loader - holds data of a VRPTW Solomon-formatted test."""
+    
+    # Possible customer ordering (when inserting into initial solution)
+    sort_keys = dict(
+        by_timewin_asc  = staticmethod(lambda x: x[B]-x[A]), # ascending TW
+        by_timewin_desc = staticmethod(lambda x: x[A]-x[B]), # descending TW
+        by_id           = staticmethod(lambda x: 0),         # unsorted
+        by_random_ord   = staticmethod(lambda x: Random().random) # random order
+    )
+
+    sort_order = sort_keys['by_timewin_asc']
+    
     def __init__(self, stream):
         lines = stream.readlines()
         self.name = lines[0].strip()
@@ -77,6 +88,9 @@ class VrptwTask(object):
             print "  Dist now %.2f, load now %.2f" % (dist, cap)
         print "Route stored dist %.2f, load %.2f" % (route[R_DIS], route[R_CAP])
 
+    def getSortedCustomers(self):
+        """Return customer tuples."""
+        return sorted(self.cust[1:], key=VrptwTask.sort_order)
             
 def error(msg):
     """A function to print or suppress errors."""
@@ -299,6 +313,13 @@ def remove_customer(sol, r, pos):
     u.add(sol.r[r], R_LEN, -1)
     return b
 
+operations = set()
+def operation(func):
+    """A decorator for single solution operations (maybe lengthy)."""
+    operations.add(func.__name__)
+    return func
+
+@operation
 def solution_diag(sol):
     if not sol.check():
         badroute = dropwhile(sol.check_route, xrange(len(sol.r))).next()
@@ -308,28 +329,15 @@ def solution_diag(sol):
         print "----\n"*3, "Was before:"
         sol.task.routeInfo(sol.r[badroute])
         exit()
-    
-def build_first(sol, sortkey = lambda c: c[B]-c[A]):
+
+@operation
+def build_first(sol):
     """Greedily construct the first solution."""
-    for c in sorted(sol.task.cust[1:], key=sortkey):
+    for c in sol.task.getSortedCustomers():
         insert_customer(sol, c[ID])
         solution_diag(sol)
         u.checkpoint()
     u.commit()
-    
-def check_initial_sorting(test):
-    sorters = [ 
-               lambda x: x[B]-x[A], # ascending TW
-               lambda x: x[A]-x[B], # descending TW
-               lambda x: 0 # unsorted
-               ]
-    task = VrptwTask(test)
-    s = [ VrptwSolution(task) for x in sorters ]
-    for data in zip(s, sorters):
-        build_first(*data)
-    results = [ (sol.k, sol.dist) for sol in s ]
-    best = map(lambda x: x[1], sorted(zip(results, range(1,4))))
-    print task.name, results, best 
     
 def test_initial_creation():
     """Unit test for creating solutions to all included benchmarks."""
@@ -357,7 +365,8 @@ def op_rand_remove_greedy_ins(sol, randint = Random().randint):
     pos = randint(0, sol.r[r][R_LEN]-2)
     c = remove_customer(sol, r, pos)  
     insert_customer(sol, c)
-    
+
+@operation
 def local_search(sol, oper=op_rand_remove_greedy_ins, ci=u.commit, undo=u.undo):
     """Optimize solution by local search."""
     oldval = sol.val()
@@ -379,30 +388,64 @@ def local_search(sol, oper=op_rand_remove_greedy_ins, ci=u.commit, undo=u.undo):
             print "No further changes. Quitting."
             break
 
+# MAIN COMMANDS
+        
+commands = set()
 def command(func):
     """A command decorator - the decoratee should be a valid command."""
+    commands.add(func.__name__)
     return func
 
 @command
 def optimize(args):
     """Perform optimization of a VRPTW instance according to the arguments."""
     sol = VrptwSolution(VrptwTask(args.test))
-    build_first(sol)
-    local_search(sol)
-    print_like_Czarnas(sol)
-    
+    op_list = args.run if args.run else presets[args.preset]
+    for op in op_list:
+        globals()[op](sol)
+
+# OPERATION PRESETS
+
+presets = {
+    'default': "build_first local_search print_like_Czarnas".split()
+}
+
 def main():    
     """Entry point when this module is ran at top-level.
     This function may change, testing some current new functionality."""
     try:
-        from argparse import ArgumentParser
-        parser = ArgumentParser(description="Optimizing VRPTW instances with ")
-        # TODO: maybe add first argument (command), like svn, mercurial etc.
-        parser.add_argument("--tkview", action="store_true", help="Display routes on a Tkinter canvas")
-        # TODO: remove -- (optionality) after test period
-        parser.add_argument("--test", type=file, default='solomons/c101.txt')
+        from argparse import ArgumentParser, Action
+        parser = ArgumentParser(
+            epilog="The default presets are: "+str(presets['default']),
+            description="Optimizing VRPTW instances with some heuristics")
+        parser.add_argument(
+            "command", choices=commands,
+            help="choose operation mode (currently only optimize)")
+        parser.add_argument(
+            "test", type=file, nargs='?', default='solomons/c101.txt',
+            help="the test instance: txt format as by M. Solomon")
+        parser.add_argument(
+            "--run", "-e", choices=operations, action="append",
+            help="perform specific available operation on the solution")
+        parser.add_argument(
+            "--preset", choices=presets.keys(), default="default",
+            help="choose a preset of operations (for optimize command)")
+        parser.add_argument(
+            "--tkview", action="store_true",
+            help="display routes on a Tkinter canvas")
+        class OrderSwitcher(Action):
+            def __call__(self, parser, namespace, values,
+                         option_string=None):
+                VrptwTask.sort_order = VrptwTask.sort_keys[values]
+        parser.add_argument(
+            "--order", action=OrderSwitcher,
+            choices=VrptwTask.sort_keys.keys(),
+            help="choose specific order for initial customers")
+        
         args = parser.parse_args()
-        optimize(args)
+        # execute the selected command
+        print args
+        globals()[args.command](args)
     except ImportError:
         print "Install argparse module"
         
