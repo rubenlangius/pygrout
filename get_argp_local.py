@@ -1,23 +1,27 @@
-import zipfile
-import urllib2
-import os
+#!/usr/bin/env python
 
-if os.path.exists('argparse.pyc'):
-    exit()
+try:
+    import argparse
+except ImportError:
+    import zipfile
+    import urllib2
+    import os
+    
+    # A non-seekable stream doesn't suffice, downloading
+    open('argparse.zip', 'wb').write(urllib2.urlopen(
+        'http://argparse.googlecode.com/files/argparse-1.1.zip'
+    ).read())
 
-open('argparse.zip', 'wb').write(
-    urllib2.urlopen(
-        'http://argparse.googlecode.com/files/argparse-1.1.zip').read())
+    # Extract the module file
+    f = zipfile.ZipFile('argparse.zip')
+    open('argparse.py', 'w').write(f.read('argparse-1.1/argparse.py'))
+    f.close()
 
-
-f = zipfile.ZipFile('argparse.zip')
-
-open('argparse.py', 'w').write(f.open('argparse-1.1/argparse.py', 'r').read())
-
-f.close()
-
-# compile 
-import argparse
-
-os.remove('argparse.py')
-os.remove('argparse.zip')
+    # Compile 
+    import argparse
+    
+    # Cleanup
+    os.remove('argparse.py')
+    os.remove('argparse.zip')
+else:
+    print "Error: argparse is already available"
