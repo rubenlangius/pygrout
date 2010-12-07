@@ -338,24 +338,6 @@ def build_first(sol):
         solution_diag(sol)
         u.checkpoint()
     u.commit()
-    
-def test_initial_creation():
-    """Unit test for creating solutions to all included benchmarks."""
-    def check_one(test):
-        s = VrptwSolution(VrptwTask(test))
-        build_first(s)
-        assert s.check()==True, 'Benchmark %s failed at initial solution' % test
-    from glob import iglob
-
-    completed = 0
-    # Homberger's are too heavy
-    # from itertools import chain
-    # tests = chain(iglob("solomons/*.txt"), iglob('hombergers/*.txt'))
-    tests = iglob("solomons/*.txt")
-    for test in tests:
-        yield check_one, test
-        completed += 1
-    assert completed == 56, 'Wrong number of checked benchmarks'
 
 def op_rand_remove_greedy_ins(sol, randint = Random().randint):
     """Neighbourhood operator - remove random customer and insert back."""
@@ -407,7 +389,8 @@ def optimize(args):
 # OPERATION PRESETS
 
 presets = {
-    'default': "build_first local_search print_like_Czarnas".split()
+    'default': "build_first local_search print_like_Czarnas".split(),
+    'initial': "build_first print_like_Czarnas".split()
 }
 
 def main():    
@@ -419,7 +402,7 @@ def main():
             epilog="The default presets are: "+str(presets['default']),
             description="Optimizing VRPTW instances with some heuristics")
         parser.add_argument(
-            "command", choices=commands,
+            "command", choices=commands, nargs="?", default="optimize",
             help="choose operation mode (currently only optimize)")
         parser.add_argument(
             "test", type=file, nargs='?', default='solomons/c101.txt',
