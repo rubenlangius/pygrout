@@ -236,7 +236,7 @@ def insert_at_pos(sol, c, r, pos):
     # update count
     u.add(sol.r[r], R_LEN, 1)
 
-def find_bestpos_on(sol, c, r):
+def find_bestpos_on(sol, c, r, forbid=None):
     """Finds best position to insert customer on existing route."""
     pos, mininc = None, None
     # check capacity
@@ -249,16 +249,21 @@ def find_bestpos_on(sol, c, r):
         larr_a = min(sol.b(a), larr_c-sol.t(a, c))
         if  arr_c <= larr_c and arr_a <= larr_a:
             distinc = -(sol.d(a, c) + sol.d(c, b) - sol.d(a, b))
-            if mininc < distinc:
+            if mininc < distinc and i <> forbid:
                 pos, mininc = i, distinc
     return mininc, pos
 
 def find_bestpos(sol, c):
     """Find best positions on any route, return the route pos and distance.
-    
     The exact format is a nested tuple: ((-distance increase, position), route)"""
     return max((find_bestpos_on(sol, c, rn), rn) for rn in xrange(len(sol.r)))
 
+
+def find_bestpos_except_pos(sol, c, r, pos):
+    """Find best position on routes other than position pos on route r.
+    Most likely to be called with customer previous position."""
+    return max((find_bestpos_on(sol, c, rn, [pos if rn==r else None]), rn) for rn in xrange(len(sol.r)))
+    
 # TODO: maybe return where we finally inserted him
 def insert_customer(sol, c):
     """Insert customer at best position or new route."""
@@ -266,6 +271,7 @@ def insert_customer(sol, c):
         insert_new(sol, c)
         if DEBUG_INIT:
             print c, ">new", len(sol.r)-1
+        return len(sol.r)-1, 0
     else:
         # best distinc, best pos, best route
         (bd, bp), br = find_bestpos(sol, c)
@@ -275,10 +281,12 @@ def insert_customer(sol, c):
             if DEBUG_INIT:
                 print "Cust %d to route %d after %d distinc %.3f" % (
                     c, br, sol.r[br][R_EDG][bp][E_FRO], -bd )
+            return br, bp
         else:
             insert_new(sol, c)
             if DEBUG_INIT:
                 print c, ">new", len(sol.r)-1
+            return len(sol.r)-1, 0
 
 def remove_customer(sol, r, pos):
     """Remove customer at pos from a route and return his ID."""
@@ -349,7 +357,7 @@ def op_rand_remove_greedy_ins(sol, randint = Random().randint):
     insert_customer(sol, c)
 
 @operation
-def local_search(sol, oper=op_rand_remove_greedy_ins, ci=u.commit, undo=u.undo):
+def local_search(sol, oper=op_rand_remove_greedy_ins, ci=u.commit, undo=u.undo, verbose=False, listener=None):
     """Optimize solution by local search."""
     oldval = sol.val()
     for j in xrange(20): # thousands of iterations
@@ -357,7 +365,10 @@ def local_search(sol, oper=op_rand_remove_greedy_ins, ci=u.commit, undo=u.undo):
         for x in xrange(1000):
             oper(sol)
             if sol.val() < oldval:
-                print "From (%d, %.4f) to (%d, %.4f)" % (oldval + sol.val())
+                if verbose:
+                    print "From (%d, %.4f) to (%d, %.4f)" % (oldval + sol.val())
+                if listener:
+                    listener(sol)
                 solution_diag(sol)
                 oldval = sol.val()
                 if not sol.check():
@@ -369,6 +380,19 @@ def local_search(sol, oper=op_rand_remove_greedy_ins, ci=u.commit, undo=u.undo):
         if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-6:
             print "No further changes. Quitting."
             break
+
+@operation
+def parallel_search(sol):
+    import multiprocessing
+    
+@operation
+def save_solution(sol):
+    import os
+    import cPickle
+
+@operation
+def print_bottomline(sol):
+    print "%d %.2f" % (sol.k, sol.dist)
 
 # MAIN COMMANDS
         
@@ -383,6 +407,7 @@ def optimize(args):
     """Perform optimization of a VRPTW instance according to the arguments."""
     sol = VrptwSolution(VrptwTask(args.test))
     op_list = args.run if args.run else presets[args.preset]
+    # TODO: maybe check if this is marked as operation at all ;)
     for op in op_list:
         globals()[op](sol)
 
@@ -390,6 +415,7 @@ def optimize(args):
 
 presets = {
     'default': "build_first local_search print_like_Czarnas".split(),
+    'brief': "build_first local_search print_bottomline".split(),
     'initial': "build_first print_like_Czarnas".split()
 }
 
@@ -427,11 +453,11 @@ def main():
         
         args = parser.parse_args()
         # execute the selected command
-        print args
-        globals()[args.command](args)
     except ImportError:
         print "Install argparse module"
-        
+    else:
+        globals()[args.command](args)
+
 if __name__=='__main__':
     main()
     
