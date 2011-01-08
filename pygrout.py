@@ -4,6 +4,7 @@ from math import hypot
 from random import Random
 from itertools import count, izip, dropwhile
 import sys
+import os
 
 # for imports in some environments
 sys.path.append('.')
@@ -37,6 +38,7 @@ class VrptwTask(object):
         self.cust = [ tuple(map(int, x.split())) for x in lines[9:] ]
         self.N = len(self.cust)-1
         self.precompute()
+        self.load_best()
         
     def precompute(self):
         """Initialize or update computed members: distances and times."""
@@ -91,6 +93,19 @@ class VrptwTask(object):
     def getSortedCustomers(self):
         """Return customer tuples."""
         return sorted(self.cust[1:], key=VrptwTask.sort_order)
+
+    def load_best(self):
+        """Look for saved best solution values in the bestknown/ dir."""
+        try:
+            self.best_k, self.best_dist = map(eval,  open(
+                os.path.join('bestknown', self.name+'.txt')).read().split())
+            print("Best known solution for test %(name)s: %(best_k)d routes,"
+                  " %(best_dist).2f total distance." % self.__dict__)
+        except:
+            self.best_k, self.best_dist = None, None
+            print >>sys.stderr, ("Best known solution not found for test: "
+                                 +self.name)
+            raise
             
 def error(msg):
     """A function to print or suppress errors."""
@@ -386,13 +401,9 @@ def parallel_search(sol):
     import multiprocessing
     
 @operation
-def save_solution(sol):
-    import os
-    import cPickle
-
-@operation
 def print_bottomline(sol):
     print "%d %.2f" % (sol.k, sol.dist)
+    return sol
 
 # MAIN COMMANDS
         
@@ -402,6 +413,14 @@ def command(func):
     commands.add(func.__name__)
     return func
 
+@operation
+def save_solution(sol):
+    from cPickle import dump
+    from uuid import uuid1
+    print sol.r
+    dump(sol.r, open(sol.task.name+'-'+str(uuid1())+'.p', 'wb'), 2)
+    return sol
+    
 @command
 def optimize(args):
     """Perform optimization of a VRPTW instance according to the arguments."""
@@ -410,18 +429,34 @@ def optimize(args):
     # TODO: maybe check if this is marked as operation at all ;)
     for op in op_list:
         globals()[op](sol)
+    return sol
 
+@command
+def run_all(args):
+    """As optimize, but runs all instances."""
+    from multiprocessing import Pool
+    p = Pool(2)
+    from glob import glob
+    from copy import deepcopy
+    def process(fname):
+        a = deepcopy(args)
+        a.test = open(fname)
+        optimize(a)
+        
+    #p.map(process, glob('solomons/*.txt')+glob('hombergers/*.txt'))
+    map(process, glob('solomons/*.txt')+glob('hombergers/*.txt'))
+    
 # OPERATION PRESETS
 
 presets = {
-    'default': "build_first local_search print_like_Czarnas".split(),
-    'brief': "build_first local_search print_bottomline".split(),
-    'initial': "build_first print_like_Czarnas".split()
+    'default': "build_first local_search print_like_Czarnas save_solution".split(),
+    'brief': "build_first local_search print_bottomline save_solution".split(),
+    'initial': "build_first print_like_Czarnas save_solution".split()
 }
 
-def main():    
-    """Entry point when this module is ran at top-level.
-    This function may change, testing some current new functionality."""
+def get_argument_parser():
+    """Create and configure an argument parser.
+    Used by main function; may be used for programmatic access."""
     try:
         from argparse import ArgumentParser, Action
         parser = ArgumentParser(
@@ -450,13 +485,18 @@ def main():
             "--order", action=OrderSwitcher,
             choices=VrptwTask.sort_keys.keys(),
             help="choose specific order for initial customers")
-        
-        args = parser.parse_args()
-        # execute the selected command
+        return parser
     except ImportError:
         print "Install argparse module"
-    else:
-        globals()[args.command](args)
+        raise
+    
+def main():    
+    """Entry point when this module is ran at top-level.
+    This function may change, testing some current new functionality."""
+    parser = get_argument_parser()
+    args = parser.parse_args()
+    # execute the selected command
+    globals()[args.command](args)
 
 if __name__=='__main__':
     main()
