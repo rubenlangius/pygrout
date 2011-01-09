@@ -6,9 +6,9 @@ homberger_urls = [
 ]
 
 solomon_urls = [
+'http://web.cba.neu.edu/~msolomon/c1c2solu.htm',
 'http://web.cba.neu.edu/~msolomon/r1r2solu.htm',
 'http://web.cba.neu.edu/~msolomon/rc12solu.htm',
-'http://web.cba.neu.edu/~msolomon/c1c2solu.htm',
 'http://web.cba.neu.edu/~msolomon/heuristi.htm'
 ]
 
@@ -46,13 +46,13 @@ def get_hombergers_sintef():
             summary.append('%-7s %3s %s' % (name, vehicles, distance))
             print summary[-1]
         print "Downloaded %.1f KB in %.1f s (%.1f KB/s)" % (kb, s, kb/s)
-    open('bestknown/summary_H.txt', 'w').write("\n".join(summary))
+    open('bestknown/summary_H.txt', 'w').write("\n".join(sorted(summary)))
 
 def get_solomons():
     """Download best results for Solomons tests as published by himself."""
     import os.path
     # local debug proxy for downloading - uncomment below
-    get = lambda url: open(os.path.basename(url)).read()
+    # get = lambda url: open(os.path.basename(url)).read()
     summary = []
     for u in solomon_urls:
         print "Visiting", u
