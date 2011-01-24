@@ -119,9 +119,18 @@ class VrptwSolution(object):
         self.r = []
         self.dist = 0.
         self.k = 0
+        
     def val(self):
         """Return a tuple to represent the solution value; less is better."""
         return (self.k, self.dist)
+        
+    def percentage(self):
+        """Return a tuple of precentage of current solution vs best known."""
+        if self.task.best_k:
+            return (100.*self.k/self.task.best_k, 100.*self.dist/self.task.best_dist)
+        return (None, None)
+        
+    # Shorthands for access to task object.
     def d(self, a, b):
         return self.task.dist[a][b]
     def t(self, a, b):
@@ -132,8 +141,11 @@ class VrptwSolution(object):
         return self.task.cust[c][B]
     def dem(self, c):
         return self.task.cust[c][DEM]
+        
     def route(self, i):
+        """Render a short representation of route i."""
         return "-".join(str(e[0]) for e in self.r[i][R_EDG])
+        
     def check(self, complete=False):
         """Checks solution, possibly partial, for inconsistency."""
         unserviced = set(range(1, self.task.N+1))
@@ -149,6 +161,8 @@ class VrptwSolution(object):
         return self.check(True)
 
     def check_route(self, i, unserviced_ = None ):
+        """Check route i for consistency. 
+        Remove found customers from unserviced_"""
         now, dist, cap, l = 0, 0, 0, 0
         unserviced = unserviced_ or set(range(1, self.task.N+1))
         for fro, to, afro, lato in self.r[i][R_EDG]:
@@ -193,7 +207,6 @@ def insert_new(sol, c):
 
 def propagate_arrival(sol, r, pos):
     """Update arrivals (actual service begin) on a route after pos."""
-    # TODO: make remove_... use it.
     edges = sol.r[r][R_EDG]
     a, b, arr_a, _ = edges[pos]
     for idx in xrange(pos+1, len(edges)):
@@ -205,11 +218,9 @@ def propagate_arrival(sol, r, pos):
         u.set(edges[idx], E_ARF, new_arrival)
         a = b
         arr_a = new_arrival
-        
-    
+
 def propagate_deadline(sol, r, pos):
     """Update deadlines (latest legal service begin) on a route before pos."""
-    # TODO: check, make insert_... and remove_... use it.
     edges = sol.r[r][R_EDG]
     _, b, _, larr_b = edges[pos]
     for idx in xrange(pos-1, -1, -1):
@@ -221,7 +232,7 @@ def propagate_deadline(sol, r, pos):
         u.set(edges[idx], E_LAT, new_deadline)
         b = a
         larr_b = new_deadline
-    
+
 def insert_at_pos(sol, c, r, pos):
     """Inserts c into route ad pos. Does no checks."""
     # update edges (with arival times)
@@ -231,7 +242,7 @@ def insert_at_pos(sol, c, r, pos):
     # arrival and latest arrival time to middle
     arr_c = max(arr_a + sol.t(a, c), sol.a(c))
     larr_c = min(sol.b(c), larr_b-sol.t(c, b))
-    assert arr_c <= larr_c
+    assert arr_c <= larr_c, 'invalid insertion, time window violated'
     # new edges - second then first
     u.ins(edges, pos, [c, b, arr_c, larr_b])
     u.ins(edges, pos, [a, c, arr_a, larr_c])
@@ -270,16 +281,21 @@ def find_bestpos_on(sol, c, r, forbid=None):
 
 def find_bestpos(sol, c):
     """Find best positions on any route, return the route pos and distance.
-    The exact format is a nested tuple: ((-distance increase, position), route)"""
+    The exact format is a nested tuple: ((-dist increase, position), route)"""
     return max((find_bestpos_on(sol, c, rn), rn) for rn in xrange(len(sol.r)))
-
 
 def find_bestpos_except_pos(sol, c, r, pos):
     """Find best position on routes other than position pos on route r.
     Most likely to be called with customer previous position."""
-    return max((find_bestpos_on(sol, c, rn, [pos if rn==r else None]), rn) for rn in xrange(len(sol.r)))
-    
-# TODO: maybe return where we finally inserted him
+    return max((find_bestpos_on(sol, c, rn, [pos if rn==r else None]), rn) 
+        for rn in xrange(len(sol.r)))
+
+def find_bestpos_except_route(sol, c, r):
+    """Find best position on routes other than position pos on route r.
+    Most likely to be called with customer previous route."""
+    return max((find_bestpos_on(sol, c, rn), rn) 
+        for rn in xrange(len(sol.r)) if rn <> r)
+
 def insert_customer(sol, c):
     """Insert customer at best position or new route."""
     if not len(sol.r):
@@ -305,11 +321,11 @@ def insert_customer(sol, c):
 
 def remove_customer(sol, r, pos):
     """Remove customer at pos from a route and return his ID."""
-    assert pos < sol.r[r][R_LEN]
+    assert pos < sol.r[r][R_LEN], 'removal past route end'
     edges = sol.r[r][R_EDG]
     a, b, arr_a, larr_b = u.pop(edges, pos)
     d, c, arr_b, larr_c = u.pop(edges, pos)
-    assert b == d
+    assert b == d, 'adjacent edges do not meet in one node'
     
     if sol.r[r][R_LEN] == 2: # last customer - remove route
         rt = u.pop(sol.r, r)
@@ -319,7 +335,7 @@ def remove_customer(sol, r, pos):
         u.ada(sol, 'dist', -rt[R_DIS])
         return b
 
-    assert arr_a + sol.t(a, c) < larr_c
+    assert arr_a + sol.t(a, c) < larr_c, 'time window error after removal'
     u.ins(edges, pos, [a, c, arr_a, larr_c])
 
     # propagating time window constraints
@@ -336,11 +352,70 @@ def remove_customer(sol, r, pos):
     u.add(sol.r[r], R_LEN, -1)
     return b
 
+# NEIGBOURHOOD OPERATORS - single step trials
+
+def op_greedy_single(sol, randint = Random().randint):
+    """Neighbourhood operator - remove random customer and insert back."""
+    # pick a route
+    r = randint(0, sol.k-1)
+    pos = randint(0, sol.r[r][R_LEN]-2)
+    c = remove_customer(sol, r, pos)  
+    insert_customer(sol, c)
+
+def op_greedy_multiple(sol, randint = Random().randint):
+    """Remove a few customers from a random route and insert them back."""
+    r = randint(0, sol.k-1)
+    num_removed = randint(1, min(8, sol.r[r][R_LEN]-1))
+    removed = []
+    for i in xrange(num_removed):
+        removed.append(remove_customer(sol, r, randint(0, sol.r[r][R_LEN]-2)))
+    for c in removed:
+        insert_customer(sol, c)
+
+def op_fight_shortest(sol):
+    # _, r = min( (sol.r[i][R_LEN], i) for i in xrange(sol.k) )
+    pass
+
+# OPERATIONS - single solution building blocks
+
 operations = set()
 def operation(func):
     """A decorator for single solution operations (maybe lengthy)."""
     operations.add(func.__name__)
     return func
+
+@operation
+def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, verbose=False, listener=None):
+    """Optimize solution by local search."""
+    oldval = sol.val()
+    print oldval, sol.percentage()
+    for j in xrange(20): # thousands of iterations
+        value_before_batch = sol.val()
+        for x in xrange(1000):
+            oper(sol)
+            if sol.val() < oldval:
+                if verbose:
+                    print ("From (%d, %.4f) to (%d, %.4f) - (%.1f%%, %.1f%%)" 
+                          % (oldval + sol.val() + sol.percentage()))
+                if listener:
+                    listener(sol)
+                solution_diag(sol)
+                oldval = sol.val()
+                ci()
+            else:
+                undo()
+        print oldval, sol.percentage()
+        if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-6:
+            print "No further changes. Quitting."
+            break
+
+@operation
+def simulated_annealing(sol, oper=op_greedy_multiple):
+    pass
+
+@operation
+def parallel_search(sol):
+    import multiprocessing
 
 @operation
 def solution_diag(sol):
@@ -362,51 +437,13 @@ def build_first(sol):
         u.checkpoint()
     u.commit()
 
-def op_rand_remove_greedy_ins(sol, randint = Random().randint):
-    """Neighbourhood operator - remove random customer and insert back."""
-    # pick a route
-    r = randint(0, sol.k-1)
-    # _, r = min( (sol.r[i][R_LEN], i) for i in xrange(sol.k) )
-    pos = randint(0, sol.r[r][R_LEN]-2)
-    c = remove_customer(sol, r, pos)  
-    insert_customer(sol, c)
-
-@operation
-def local_search(sol, oper=op_rand_remove_greedy_ins, ci=u.commit, undo=u.undo, verbose=False, listener=None):
-    """Optimize solution by local search."""
-    oldval = sol.val()
-    for j in xrange(20): # thousands of iterations
-        value_before_batch = sol.val()
-        for x in xrange(1000):
-            oper(sol)
-            if sol.val() < oldval:
-                if verbose:
-                    print "From (%d, %.4f) to (%d, %.4f)" % (oldval + sol.val())
-                if listener:
-                    listener(sol)
-                solution_diag(sol)
-                oldval = sol.val()
-                if not sol.check():
-                    print "ERR"
-                ci()
-            else:
-                undo()
-        print oldval
-        if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-6:
-            print "No further changes. Quitting."
-            break
-
-@operation
-def parallel_search(sol):
-    import multiprocessing
-    
 @operation
 def print_bottomline(sol):
     print "%d %.2f" % (sol.k, sol.dist)
     return sol
 
 # MAIN COMMANDS
-        
+
 commands = set()
 def command(func):
     """A command decorator - the decoratee should be a valid command."""
@@ -417,10 +454,10 @@ def command(func):
 def save_solution(sol):
     from cPickle import dump
     from uuid import uuid1
-    print sol.r
-    dump(sol.r, open(sol.task.name+'-'+str(uuid1())+'.p', 'wb'), 2)
+    #print sol.r
+    dump(sol.r, open(sol.task.name+'-'+str(uuid1())+'.p', 'wb'))
     return sol
-    
+
 @command
 def optimize(args):
     """Perform optimization of a VRPTW instance according to the arguments."""
@@ -442,16 +479,16 @@ def run_all(args):
         a = deepcopy(args)
         a.test = open(fname)
         optimize(a)
-        
+    
     #p.map(process, glob('solomons/*.txt')+glob('hombergers/*.txt'))
     map(process, glob('solomons/*.txt')+glob('hombergers/*.txt'))
-    
+
 # OPERATION PRESETS
 
 presets = {
     'default': "build_first local_search print_like_Czarnas save_solution".split(),
     'brief': "build_first local_search print_bottomline save_solution".split(),
-    'initial': "build_first print_like_Czarnas save_solution".split()
+    'initial': "build_first print_like_Czarnas".split()
 }
 
 def get_argument_parser():
@@ -489,10 +526,9 @@ def get_argument_parser():
     except ImportError:
         print "Install argparse module"
         raise
-    
-def main():    
-    """Entry point when this module is ran at top-level.
-    This function may change, testing some current new functionality."""
+
+def main():
+    """Entry point when this module is ran at top-level."""
     parser = get_argument_parser()
     args = parser.parse_args()
     # execute the selected command
