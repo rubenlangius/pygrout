@@ -279,6 +279,23 @@ def find_bestpos_on(sol, c, r, forbid=None):
                 pos, mininc = i, distinc
     return mininc, pos
 
+def find_allpos_on(sol, c, r):
+    """Find all positions where customer c can be inserted on route r
+    and return them as tuples (distinc, position)."""
+    # check capacity
+    if sol.r[r][R_CAP] + sol.dem(c) > sol.task.capa:
+        return []
+    positions = []
+    # check route edges
+    for (a, b, arr_a, larr_b), i in izip(sol.r[r][R_EDG], count()):
+        arr_c = max(arr_a + sol.t(a, c), sol.a(c)) # earliest possible
+        larr_c = min(sol.b(c), larr_b-sol.t(c, b)) # latest if c WAS here
+        larr_a = min(sol.b(a), larr_c-sol.t(a, c))
+        if  arr_c <= larr_c and arr_a <= larr_a:
+            distinc = -(sol.d(a, c) + sol.d(c, b) - sol.d(a, b))
+            positions.append((distinc, pos))
+    return positions
+    
 def find_bestpos(sol, c):
     """Find best positions on any route, return the route pos and distance.
     The exact format is a nested tuple: ((-dist increase, position), route)"""
