@@ -119,6 +119,8 @@ class VrptwSolution(object):
         self.r = []
         self.dist = 0.
         self.k = 0
+        # additional field for any purpose
+        self.mem = {}
         
     def val(self):
         """Return a tuple to represent the solution value; less is better."""
@@ -405,8 +407,10 @@ def operation(func):
 def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, verbose=False, listener=None):
     """Optimize solution by local search."""
     oldval = sol.val()
+    last_update = 0
+    update_count = 0
     print oldval, sol.percentage()
-    for j in xrange(20): # thousands of iterations
+    for j in count(): # xrange(20): # thousands of iterations
         value_before_batch = sol.val()
         for x in xrange(1000):
             oper(sol)
@@ -418,13 +422,18 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, verbose
                     listener(sol)
                 solution_diag(sol)
                 oldval = sol.val()
+                update_count += 1
+                last_update = 1000*j + x
                 ci()
             else:
                 undo()
         print oldval, sol.percentage()
-        if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-6:
-            print "No further changes. Quitting."
+        if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-2:
+            print( "No further changes. Quitting after %dx1000." % (j+1,))
+            sol.mem['iterations'] = 1000*(j+1)
+            sol.mem['improvements'] = update_count
             break
+    return sol
 
 @operation
 def simulated_annealing(sol, oper=op_greedy_multiple):
@@ -471,18 +480,28 @@ def command(func):
 def save_solution(sol):
     from cPickle import dump
     from uuid import uuid1
-    #print sol.r
-    dump(sol.r, open(sol.task.name+'-'+str(uuid1())+'.p', 'wb'))
+    save_name = sol.task.name+'-'+str(uuid1())+'.p'
+    sol.mem['save_name'] = save_name
+    save_data = dict(
+        routes = sol.r,
+        mem = sol.mem,
+        val = sol.val(),
+        percentage = sol.percentage() )
+    dump(save_data, open(save_name, 'wb'))
     return sol
 
 @command
 def optimize(args):
     """Perform optimization of a VRPTW instance according to the arguments."""
+    import time
     sol = VrptwSolution(VrptwTask(args.test))
     op_list = args.run if args.run else presets[args.preset]
+    start = time.time()
     # TODO: maybe check if this is marked as operation at all ;)
     for op in op_list:
         globals()[op](sol)
+    sol.mem['t_elapsed'] = time.time()-start
+    print(sol.mem)
     return sol
 
 @command
@@ -503,7 +522,7 @@ def run_all(args):
 # OPERATION PRESETS
 
 presets = {
-    'default': "build_first local_search print_like_Czarnas save_solution".split(),
+    'default': "build_first local_search save_solution".split(),
     'brief': "build_first local_search print_bottomline save_solution".split(),
     'initial': "build_first print_like_Czarnas".split()
 }
