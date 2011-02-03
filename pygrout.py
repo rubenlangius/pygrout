@@ -5,9 +5,11 @@ from random import Random
 from itertools import count, izip, dropwhile
 import sys
 import os
+import time
 
-# for imports in some environments
-sys.path.append('.')
+# for imports in some environments (now 'if' guarded)
+if '.' not in sys.path:
+    sys.path.append('.')
 
 # additional modules
 from consts import *
@@ -490,17 +492,21 @@ def save_solution(sol):
     dump(save_data, open(save_name, 'wb'))
     return sol
 
+def _optimize(test, operations):
+    """An optimization funtion, which does not use argparse namespace."""
+    sol = VrptwSolution(VrptwTask(test))
+    start = time.time()
+    # TODO: maybe check if this is marked as operation at all ;)
+    for op in operations:
+        globals()[op](sol)
+    sol.mem['t_elapsed'] = time.time()-start
+    return sol
+    
 @command
 def optimize(args):
     """Perform optimization of a VRPTW instance according to the arguments."""
-    import time
-    sol = VrptwSolution(VrptwTask(args.test))
     op_list = args.run if args.run else presets[args.preset]
-    start = time.time()
-    # TODO: maybe check if this is marked as operation at all ;)
-    for op in op_list:
-        globals()[op](sol)
-    sol.mem['t_elapsed'] = time.time()-start
+    sol = _optimize(args.test, op_list)
     print(sol.mem)
     return sol
 
@@ -550,6 +556,12 @@ def get_argument_parser():
         parser.add_argument(
             "--tkview", action="store_true",
             help="display routes on a Tkinter canvas")
+        parser.add_argument(
+            "--runs", "-n", type=int, default=1,
+            help="repeat (e.g. optimization) n times, or use n processes")
+        parser.add_argument(
+            "--multi", "-p", action="store_true",
+            help="use multiprocessing for parallelism")
         class OrderSwitcher(Action):
             def __call__(self, parser, namespace, values,
                          option_string=None):
