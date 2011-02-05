@@ -36,6 +36,7 @@ class VrptwTask(object):
     def __init__(self, stream):
         lines = stream.readlines()
         self.name = lines[0].strip()
+        self.filename = stream.name
         self.Kmax, self.capa = map(int, lines[4].split())
         self.cust = [ tuple(map(int, x.split())) for x in lines[9:] ]
         self.N = len(self.cust)-1
@@ -470,6 +471,32 @@ def print_bottomline(sol):
     print "%d %.2f" % (sol.k, sol.dist)
     return sol
 
+@operation
+def save_solution(sol):
+    from cPickle import dump
+    import uuid
+    prec_k, prec_d = sol.percentage()
+    save_name = "%s-%05.1f-%05.1f-%03d-%05.1f-%x.p" % (sol.task.name, 
+        prec_k, prec_d, sol.k, sol.dist, uuid.getnode())
+    sol.mem['save_name'] = save_name
+    save_data = dict(
+        routes = sol.r,
+        mem = sol.mem,
+        val = sol.val(),
+        filename = sol.task.filename,
+        name = sol.task.name,
+        percentage = sol.percentage() )
+    dump(save_data, open(save_name, 'wb'))
+    return sol
+
+# OPERATION PRESETS
+
+presets = {
+    'default': "build_first local_search save_solution".split(),
+    'brief': "build_first local_search print_bottomline save_solution".split(),
+    'initial': "build_first print_like_Czarnas".split()
+}
+
 # MAIN COMMANDS
 
 commands = set()
@@ -478,21 +505,8 @@ def command(func):
     commands.add(func.__name__)
     return func
 
-@operation
-def save_solution(sol):
-    from cPickle import dump
-    from uuid import uuid1
-    save_name = sol.task.name+'-'+str(uuid1())+'.p'
-    sol.mem['save_name'] = save_name
-    save_data = dict(
-        routes = sol.r,
-        mem = sol.mem,
-        val = sol.val(),
-        percentage = sol.percentage() )
-    dump(save_data, open(save_name, 'wb'))
-    return sol
 
-def _optimize(test, operations):
+def _optimize(test, operations = presets['default']):
     """An optimization funtion, which does not use argparse namespace."""
     sol = VrptwSolution(VrptwTask(test))
     start = time.time()
@@ -510,29 +524,18 @@ def optimize(args):
     print(sol.mem)
     return sol
 
+def _optimize_by_name(fname):
+    return _optimize(open(fname))
+    
 @command
 def run_all(args):
     """As optimize, but runs all instances."""
     from multiprocessing import Pool
-    p = Pool(2)
     from glob import glob
-    from copy import deepcopy
-    def process(fname):
-        a = deepcopy(args)
-        a.test = open(fname)
-        optimize(a)
+    p = Pool()    
+    p.map(_optimize_by_name, glob('solomons/*.txt')+glob('hombergers/*.txt'))
+    #map(process, glob('solomons/*.txt')+glob('hombergers/*.txt'))
     
-    #p.map(process, glob('solomons/*.txt')+glob('hombergers/*.txt'))
-    map(process, glob('solomons/*.txt')+glob('hombergers/*.txt'))
-
-# OPERATION PRESETS
-
-presets = {
-    'default': "build_first local_search save_solution".split(),
-    'brief': "build_first local_search print_bottomline save_solution".split(),
-    'initial': "build_first print_like_Czarnas".split()
-}
-
 def get_argument_parser():
     """Create and configure an argument parser.
     Used by main function; may be used for programmatic access."""
