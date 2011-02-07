@@ -104,11 +104,12 @@ class VrptwTask(object):
                 os.path.join('bestknown', self.name+'.txt')).read().split())
             print("Best known solution for test %(name)s: %(best_k)d routes,"
                   " %(best_dist).2f total distance." % self.__dict__)
-        except:
+        except IOError as ioe:
             self.best_k, self.best_dist = None, None
             print >>sys.stderr, ("Best known solution not found for test: "
                                  +self.name)
-            raise
+            if os.path.exists(os.path.join('bestknown', self.name+'.txt')):
+                raise
             
 def error(msg):
     """A function to print or suppress errors."""
@@ -116,6 +117,10 @@ def error(msg):
     
 class VrptwSolution(object):
     """A routes (lists of customer IDs) collection, basically."""
+    
+    # default output directory for saved solutions
+    outdir = "output"
+        
     def __init__(self, task):
         """The task could be used to keep track of it."""
         self.task = task
@@ -195,6 +200,29 @@ class VrptwSolution(object):
             return False
         return True
         
+    def save(sol):
+        """Dump (pickle) the solution."""
+        from cPickle import dump
+        import uuid
+        prec_k, prec_d = sol.percentage()
+        if prec_k is not None:
+            save_name = "%s-%05.1f-%05.1f-%03d-%05.1f-%x.p" % (
+                sol.task.name, prec_k, prec_d, sol.k, sol.dist, 
+                uuid.getnode())
+        else:
+            save_name = "%s-xxxxx-xxxxx-%03d-%05.1f-%x.p" % (
+                sol.task.name, sol.k, sol.dist, uuid.getnode())
+        sol.mem['save_name'] = save_name
+        save_data = dict(
+            routes = sol.r,
+            mem = sol.mem,
+            val = sol.val(),
+            filename = sol.task.filename,
+            name = sol.task.name,
+            percentage = sol.percentage() )
+        dump(save_data, open(os.path.join(sol.outdir, save_name), 'wb'))
+        return sol        
+
 def insert_new(sol, c):
     """Inserts customer C on a new route."""
     new_route = [
@@ -473,21 +501,7 @@ def print_bottomline(sol):
 
 @operation
 def save_solution(sol):
-    from cPickle import dump
-    import uuid
-    prec_k, prec_d = sol.percentage()
-    save_name = "%s-%05.1f-%05.1f-%03d-%05.1f-%x.p" % (sol.task.name, 
-        prec_k, prec_d, sol.k, sol.dist, uuid.getnode())
-    sol.mem['save_name'] = save_name
-    save_data = dict(
-        routes = sol.r,
-        mem = sol.mem,
-        val = sol.val(),
-        filename = sol.task.filename,
-        name = sol.task.name,
-        percentage = sol.percentage() )
-    dump(save_data, open(save_name, 'wb'))
-    return sol
+    sol.save()
 
 # OPERATION PRESETS
 
@@ -530,11 +544,13 @@ def _optimize_by_name(fname):
 @command
 def run_all(args):
     """As optimize, but runs all instances."""
-    from multiprocessing import Pool
     from glob import glob
-    p = Pool()    
-    p.map(_optimize_by_name, glob('solomons/*.txt')+glob('hombergers/*.txt'))
-    #map(process, glob('solomons/*.txt')+glob('hombergers/*.txt'))
+    if args.multi:
+        from multiprocessing import Pool
+        p = Pool()    
+        p.map(_optimize_by_name, glob(args.glob))
+    else:
+        map(_optimize_by_name, glob(args.glob))
     
 def get_argument_parser():
     """Create and configure an argument parser.
@@ -544,6 +560,7 @@ def get_argument_parser():
         parser = ArgumentParser(
             epilog="The default presets are: "+str(presets['default']),
             description="Optimizing VRPTW instances with some heuristics")
+            
         parser.add_argument(
             "command", choices=commands, nargs="?", default="optimize",
             help="choose operation mode (currently only optimize)")
@@ -564,7 +581,20 @@ def get_argument_parser():
             help="repeat (e.g. optimization) n times, or use n processes")
         parser.add_argument(
             "--multi", "-p", action="store_true",
-            help="use multiprocessing for parallelism")
+            help="use multiprocessing for parallelism e.g. with run_all")
+        parser.add_argument(
+            "--glob", "-g", default="hombergers/*.txt",
+            help="glob expression for run_all, defaults to all H")
+        
+        class DirSwitcher(Action):
+            def __call__(self, parser, namespace, values,
+                         option_string=None):
+                print values
+                VrptwSolution.outdir = values
+        parser.add_argument(
+            "--output", "-o", default="output", action=DirSwitcher,
+            help="output directory for saving solutions")
+        
         class OrderSwitcher(Action):
             def __call__(self, parser, namespace, values,
                          option_string=None):
@@ -573,6 +603,7 @@ def get_argument_parser():
             "--order", action=OrderSwitcher,
             choices=VrptwTask.sort_keys.keys(),
             help="choose specific order for initial customers")
+            
         return parser
     except ImportError:
         print "Install argparse module"
