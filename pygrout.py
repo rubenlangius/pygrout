@@ -545,12 +545,25 @@ def _optimize_by_name(fname):
 def run_all(args):
     """As optimize, but runs all instances."""
     from glob import glob
+    all_tasks = glob(args.glob) * args.runs
     if args.multi:
         from multiprocessing import Pool
         p = Pool()    
-        p.map(_optimize_by_name, glob(args.glob))
+        p.map(_optimize_by_name, all_tasks)
     else:
-        map(_optimize_by_name, glob(args.glob))
+        map(_optimize_by_name, all_tasks)
+
+@command
+def load(args):
+    """This time the argument is an opened saved solution."""
+    import cPickle
+    solution_data = cPickle.load(args.test)
+    sol = VrptwSolution(VrptwTask(open(solution_data['filename'])))
+    sol.k, sol.dist = solution_data['val']
+    sol.r = solution_data['routes']
+    if not sol.check_full():
+        return None
+    print_like_Czarnas(sol)
     
 def get_argument_parser():
     """Create and configure an argument parser.
@@ -563,7 +576,7 @@ def get_argument_parser():
             
         parser.add_argument(
             "command", choices=commands, nargs="?", default="optimize",
-            help="choose operation mode (currently only optimize)")
+            help="main command to execute")
         parser.add_argument(
             "test", type=file, nargs='?', default='solomons/c101.txt',
             help="the test instance: txt format as by M. Solomon")
