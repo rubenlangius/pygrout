@@ -204,14 +204,12 @@ class VrptwSolution(object):
         """Dump (pickle) the solution."""
         from cPickle import dump
         import uuid
-        prec_k, prec_d = sol.percentage()
-        if prec_k is not None:
-            save_name = "%s-%05.1f-%05.1f-%03d-%05.1f-%x.p" % (
+        prec_k, prec_d = map(
+            lambda x: "%05.1f" % x if x else 'x'*5, 
+            sol.percentage())        
+        save_name = "%s-%s-%s-%03d-%05.1f-%s.p" % (
                 sol.task.name, prec_k, prec_d, sol.k, sol.dist, 
-                uuid.getnode())
-        else:
-            save_name = "%s-xxxxx-xxxxx-%03d-%05.1f-%x.p" % (
-                sol.task.name, sol.k, sol.dist, uuid.getnode())
+                hex(uuid.getnode())[-4:])
         sol.mem['save_name'] = save_name
         save_data = dict(
             routes = sol.r,
@@ -221,7 +219,7 @@ class VrptwSolution(object):
             name = sol.task.name,
             percentage = sol.percentage() )
         dump(save_data, open(os.path.join(sol.outdir, save_name), 'wb'))
-        return sol        
+        return sol     
 
 def insert_new(sol, c):
     """Inserts customer C on a new route."""
@@ -440,10 +438,11 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, verbose
     oldval = sol.val()
     last_update = 0
     update_count = 0
-    print oldval, sol.percentage()
+    print " ".join([ "(%d, %.2f)" % oldval, "(%5.1f%%, %5.1f%%)" % sol.percentage() ])
+    start = time.time()
     for j in count(): # xrange(20): # thousands of iterations
         value_before_batch = sol.val()
-        for x in xrange(1000):
+        for x in xrange(2000):
             oper(sol)
             if sol.val() < oldval:
                 if verbose:
@@ -454,11 +453,17 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, verbose
                 solution_diag(sol)
                 oldval = sol.val()
                 update_count += 1
-                last_update = 1000*j + x
+                ci()
+            elif sol.val() == oldval:
                 ci()
             else:
                 undo()
-        print oldval, sol.percentage()
+        elapsed = time.time()-start
+        updates = update_count - last_update
+        print " ".join([ "(%d, %.2f)" % oldval, "(%5.1f%%, %5.1f%%)" % sol.percentage(), 
+               "%.1f s, %.2f fps, %d acc (%.2f aps)" % (elapsed, 1000/elapsed, updates, updates/elapsed) ])
+        start = time.time()
+        last_update = update_count
         if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-2:
             print( "No further changes. Quitting after %dx1000." % (j+1,))
             sol.mem['iterations'] = 1000*(j+1)
@@ -553,16 +558,22 @@ def run_all(args):
     else:
         map(_optimize_by_name, all_tasks)
 
-@command
-def load(args):
-    """This time the argument is an opened saved solution."""
+def load_solution(f):
+    """Unpickle solution from a stream."""
     import cPickle
-    solution_data = cPickle.load(args.test)
+    solution_data = cPickle.load(f)
     sol = VrptwSolution(VrptwTask(open(solution_data['filename'])))
     sol.k, sol.dist = solution_data['val']
     sol.r = solution_data['routes']
+    sol.mem = solution_data['mem']
     if not sol.check_full():
         return None
+    return sol
+    
+@command
+def load(args):
+    """This time the argument is an opened saved solution."""
+    sol = load_solution(args.test)
     print_like_Czarnas(sol)
     
 def get_argument_parser():
