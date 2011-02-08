@@ -20,6 +20,14 @@ from undo import UndoStack
 u = UndoStack()
 """Global undo - may be later made possible to override."""
 
+r = Random()
+"""The random number generator for the optimization."""
+r_seed = int(time.time())
+r.seed(r_seed)
+
+newer = False
+"""A flag to portably switch to some newer code where possible."""
+
 class VrptwTask(object):
     """Data loader - holds data of a VRPTW Solomon-formatted test."""
     
@@ -38,7 +46,10 @@ class VrptwTask(object):
         self.name = lines[0].strip()
         self.filename = stream.name
         self.Kmax, self.capa = map(int, lines[4].split())
-        self.cust = [ tuple(map(int, x.split())) for x in lines[9:] ]
+        self.cust = [ map(int, x.split()) for x in lines[9:] ]
+        if newer:
+            from numpy import array
+            self.cust = array( self.cust )
         self.N = len(self.cust)-1
         self.precompute()
         self.load_best()
@@ -129,6 +140,9 @@ class VrptwSolution(object):
         self.k = 0
         # additional field for any purpose
         self.mem = {}
+        self.mem['r_seed'] = r_seed
+        self.mem['t_start'] = time.time()
+
         
     def val(self):
         """Return a tuple to represent the solution value; less is better."""
@@ -206,11 +220,16 @@ class VrptwSolution(object):
         import uuid
         prec_k, prec_d = map(
             lambda x: "%05.1f" % x if x else 'x'*5, 
-            sol.percentage())        
-        save_name = "%s-%s-%s-%03d-%05.1f-%s.p" % (
+            sol.percentage())  
+        time_sig = "%02d%02d" % divmod(int(time.time())%3600, 60)
+        node_sig = hex(uuid.getnode())[-4:]
+        save_name = "%s-%s-%s-%02d-%05.1f-%s-%s.p" % (
                 sol.task.name, prec_k, prec_d, sol.k, sol.dist, 
-                hex(uuid.getnode())[-4:])
+                node_sig, time_sig)
         sol.mem['save_name'] = save_name
+        sol.mem['save_time'] = time.time()
+        sol.mem['t_elapsed'] = time.time() - sol.mem['t_start']
+        sol.mem['host_sig'] = node_sig
         save_data = dict(
             routes = sol.r,
             mem = sol.mem,
@@ -402,7 +421,7 @@ def remove_customer(sol, r, pos):
 
 # NEIGBOURHOOD OPERATORS - single step trials
 
-def op_greedy_single(sol, randint = Random().randint):
+def op_greedy_single(sol, randint = r.randint):
     """Neighbourhood operator - remove random customer and insert back."""
     # pick a route
     r = randint(0, sol.k-1)
@@ -410,7 +429,7 @@ def op_greedy_single(sol, randint = Random().randint):
     c = remove_customer(sol, r, pos)  
     insert_customer(sol, c)
 
-def op_greedy_multiple(sol, randint = Random().randint):
+def op_greedy_multiple(sol, randint = r.randint):
     """Remove a few customers from a random route and insert them back."""
     r = randint(0, sol.k-1)
     num_removed = randint(1, min(8, sol.r[r][R_LEN]-1))
@@ -440,17 +459,17 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, verbose
     update_count = 0
     print " ".join([ "(%d, %.2f)" % oldval, "(%5.1f%%, %5.1f%%)" % sol.percentage() ])
     start = time.time()
-    for j in count(): # xrange(20): # thousands of iterations
+    for j in count(): 
         value_before_batch = sol.val()
-        for x in xrange(2000):
+        for x in xrange(1000):
             oper(sol)
             if sol.val() < oldval:
                 if verbose:
                     print ("From (%d, %.4f) to (%d, %.4f) - (%.1f%%, %.1f%%)" 
                           % (oldval + sol.val() + sol.percentage()))
-                if listener:
-                    listener(sol)
-                solution_diag(sol)
+                # if listener:
+                #     listener(sol)
+                # solution_diag(sol)
                 oldval = sol.val()
                 update_count += 1
                 ci()
@@ -495,8 +514,8 @@ def build_first(sol):
     """Greedily construct the first solution."""
     for c in sol.task.getSortedCustomers():
         insert_customer(sol, c[ID])
-        solution_diag(sol)
-        u.checkpoint()
+        #solution_diag(sol)
+        #u.checkpoint()
     u.commit()
 
 @operation
@@ -528,11 +547,9 @@ def command(func):
 def _optimize(test, operations = presets['default']):
     """An optimization funtion, which does not use argparse namespace."""
     sol = VrptwSolution(VrptwTask(test))
-    start = time.time()
     # TODO: maybe check if this is marked as operation at all ;)
     for op in operations:
         globals()[op](sol)
-    sol.mem['t_elapsed'] = time.time()-start
     return sol
     
 @command
@@ -598,9 +615,6 @@ def get_argument_parser():
             "--preset", choices=presets.keys(), default="default",
             help="choose a preset of operations (for optimize command)")
         parser.add_argument(
-            "--tkview", action="store_true",
-            help="display routes on a Tkinter canvas")
-        parser.add_argument(
             "--runs", "-n", type=int, default=1,
             help="repeat (e.g. optimization) n times, or use n processes")
         parser.add_argument(
@@ -609,24 +623,36 @@ def get_argument_parser():
         parser.add_argument(
             "--glob", "-g", default="hombergers/*.txt",
             help="glob expression for run_all, defaults to all H")
-        
-        class DirSwitcher(Action):
+    
+        class OptionAction(Action):
+            """A dispatching action for option parser - global configs"""
             def __call__(self, parser, namespace, values,
                          option_string=None):
-                print values
-                VrptwSolution.outdir = values
+                if option_string in ['-o', '--output']:
+                    VrptwSolution.outdir = values
+                elif option_string == '--order':
+                    VrptwTask.sort_order = VrptwTask.sort_keys[values]
+                elif option_string in ['-s', '--seed']:
+                    global r_seed
+                    r_seed = int(values)
+                    r.seed(r_seed)
+
         parser.add_argument(
-            "--output", "-o", default="output", action=DirSwitcher,
+            "--seed", "-s", action=OptionAction,
+            help="Set a custom RNG seed")    
+                
+        parser.add_argument(
+            "--output", "-o", default="output", action=OptionAction,
             help="output directory for saving solutions")
         
-        class OrderSwitcher(Action):
-            def __call__(self, parser, namespace, values,
-                         option_string=None):
-                VrptwTask.sort_order = VrptwTask.sort_keys[values]
         parser.add_argument(
-            "--order", action=OrderSwitcher,
+            "--order", action=OptionAction,
             choices=VrptwTask.sort_keys.keys(),
             help="choose specific order for initial customers")
+        
+        parser.add_argument(
+            "--newer", action="store_true",
+            help="use untested extra features (caution)")
             
         return parser
     except ImportError:
@@ -637,9 +663,12 @@ def main():
     """Entry point when this module is ran at top-level."""
     parser = get_argument_parser()
     args = parser.parse_args()
+    global newer
+    if args.newer:
+        newer = True
     # execute the selected command
     globals()[args.command](args)
 
-if __name__=='__main__':
+if __name__ == '__main__':
     main()
     
