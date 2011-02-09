@@ -6,6 +6,7 @@ from itertools import count, izip, dropwhile
 import sys
 import os
 import time
+import cPickle
 
 # for imports in some environments (now 'if' guarded)
 if '.' not in sys.path:
@@ -47,9 +48,8 @@ class VrptwTask(object):
         self.filename = stream.name
         self.Kmax, self.capa = map(int, lines[4].split())
         self.cust = [ map(int, x.split()) for x in lines[9:] ]
-        if newer:
-            from numpy import array
-            self.cust = array( self.cust )
+        import array
+        self.cust = [ array.array('i', map(int, x.split())) for x in lines[9:] ]
         self.N = len(self.cust)-1
         self.precompute()
         self.load_best()
@@ -142,8 +142,12 @@ class VrptwSolution(object):
         self.mem = {}
         self.mem['r_seed'] = r_seed
         self.mem['t_start'] = time.time()
+        self.history = []
 
-        
+    def loghist(self):
+        """Put the current time and value into the history list."""
+        self.history.append( [self.k, self.dist, time.time()-self.mem['t_start']] )
+                
     def val(self):
         """Return a tuple to represent the solution value; less is better."""
         return (self.k, self.dist)
@@ -216,7 +220,6 @@ class VrptwSolution(object):
         
     def save(sol):
         """Dump (pickle) the solution."""
-        from cPickle import dump
         import uuid
         prec_k, prec_d = map(
             lambda x: "%05.1f" % x if x else 'x'*5, 
@@ -237,8 +240,21 @@ class VrptwSolution(object):
             filename = sol.task.filename,
             name = sol.task.name,
             percentage = sol.percentage() )
-        dump(save_data, open(os.path.join(sol.outdir, save_name), 'wb'))
+        cPickle.dump(save_data, open(os.path.join(sol.outdir, save_name), 'wb'))
         return sol     
+    
+    def copy(self):
+        """Return a copy the solution in a possibly cheap way."""
+        clone = VrptwSolution(self.task)
+        clone.assign(self)
+        return clone
+    
+    def assign(self, rvalue):
+        """Assignment operator - copy essential features from another solution."""
+        self.k = rvalue.k
+        self.dist = rvalue.dist
+        self.r = cPickle.loads(cPickle.dumps(rvalue.r))
+        
 
 def insert_new(sol, c):
     """Inserts customer C on a new route."""
@@ -258,10 +274,12 @@ def insert_new(sol, c):
 def propagate_arrival(sol, r, pos):
     """Update arrivals (actual service begin) on a route after pos."""
     edges = sol.r[r][R_EDG]
+    time = sol.task.time
+    cust = sol.task.cust
     a, b, arr_a, _ = edges[pos]
     for idx in xrange(pos+1, len(edges)):
         b, _, old_arrival, _ = edges[idx]
-        new_arrival = max(arr_a + sol.t(a, b), sol.a(b))
+        new_arrival = max(arr_a + time[a][b], cust[b][A])
         # check, if there is a modification
         if new_arrival == old_arrival:
             break
@@ -273,9 +291,11 @@ def propagate_deadline(sol, r, pos):
     """Update deadlines (latest legal service begin) on a route before pos."""
     edges = sol.r[r][R_EDG]
     _, b, _, larr_b = edges[pos]
+    time = sol.task.time
+    cust = sol.task.cust
     for idx in xrange(pos-1, -1, -1):
         _, a, _, old_deadline = edges[idx]
-        new_deadline = min(larr_b-sol.t(a, b), sol.b(a))
+        new_deadline = min(larr_b-time[a][b], cust[a][B])
         # check, if there is a modification
         if new_deadline == old_deadline:
             break
@@ -312,22 +332,30 @@ def insert_at_pos(sol, c, r, pos):
     # update count
     u.add(sol.r[r], R_LEN, 1)
 
-def find_bestpos_on(sol, c, r, forbid=None):
+def find_bestpos_on(sol, c, r):
     """Finds best position to insert customer on existing route."""
     pos, mininc = None, None
     # check capacity
     if sol.r[r][R_CAP] + sol.dem(c) > sol.task.capa:
         return None, None
-    # check route edges
-    for (a, b, arr_a, larr_b), i in izip(sol.r[r][R_EDG], count()):
-        arr_c = max(arr_a + sol.t(a, c), sol.a(c)) # earliest possible
-        larr_c = min(sol.b(c), larr_b-sol.t(c, b)) # latest if c WAS here
-        larr_a = min(sol.b(a), larr_c-sol.t(a, c))
+    # pull out deep things locally
+    time = sol.task.time
+    cust = sol.task.cust
+    dist = sol.task.dist
+    c_a = cust[c][A]
+    c_b = cust[c][B]
+
+    def eval_edge(pack):
+        pos, (a, b, arr_a, larr_b) = pack
+        arr_c = max(arr_a + time[a][c], c_a) # earliest possible
+        larr_c = min(c_b, larr_b-time[c][b]) # latest if c WAS here
+        larr_a = min(sol.b(a), larr_c-time[a][c])
         if  arr_c <= larr_c and arr_a <= larr_a:
-            distinc = -(sol.d(a, c) + sol.d(c, b) - sol.d(a, b))
-            if mininc < distinc and i <> forbid:
-                pos, mininc = i, distinc
-    return mininc, pos
+            return (-(dist[a][c] + dist[c][b] - dist[a][b]), pos)
+        return None, None
+        
+    # find the best edge 
+    return max(map(eval_edge, enumerate(sol.r[r][R_EDG])))
 
 def find_allpos_on(sol, c, r):
     """Find all positions where customer c can be inserted on route r
@@ -452,7 +480,7 @@ def operation(func):
     return func
 
 @operation
-def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, verbose=False, listener=None):
+def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo):
     """Optimize solution by local search."""
     oldval = sol.val()
     last_update = 0
@@ -464,14 +492,9 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, verbose
         for x in xrange(1000):
             oper(sol)
             if sol.val() < oldval:
-                if verbose:
-                    print ("From (%d, %.4f) to (%d, %.4f) - (%.1f%%, %.1f%%)" 
-                          % (oldval + sol.val() + sol.percentage()))
-                # if listener:
-                #     listener(sol)
-                # solution_diag(sol)
                 oldval = sol.val()
                 update_count += 1
+                sol.loghist()
                 ci()
             elif sol.val() == oldval:
                 ci()
@@ -488,8 +511,50 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, verbose
             sol.mem['iterations'] = 1000*(j+1)
             sol.mem['improvements'] = update_count
             break
+    sol.loghist()
     return sol
 
+@operation
+def inplace_search(sol, oper=op_greedy_multiple):
+    """Simple search around a single point."""
+    best = sol.copy()
+    for x in xrange(5000):
+        oper(sol)
+        if sol.val() < best.val():
+            best = sol.copy()
+            sol.loghist()
+        u.undo()
+    print "Starting solution:"
+    print_like_Czarnas(sol)
+    print "Best found solution:"
+    print_like_Czarnas(best)
+    sol.assign(best)
+    sol.loghist()
+    return sol
+   
+@operation
+def plot_history(sol):
+    """Display a matplotlib graph of solution progress"""
+    from matplotlib import pyplot as plt
+    k, dist, t = zip(*sol.history)
+    fig = plt.figure()
+    
+    kplt = fig.add_subplot(121)
+    kplt.plot(t, k)
+    min_k = (sol.task.best_k or 2)-2
+    kplt.axis([0, sol.history[-1][2], min_k, max(k)+1])
+    if sol.task.best_k:
+        kplt.axhline(sol.task.best_k)
+
+    dplt = fig.add_subplot(122)
+    dplt.plot(t, dist)
+    min_d = (sol.task.best_dist or 20)-20
+    dplt.axis([0, sol.history[-1][2], min_d, max(dist)+10])
+    if sol.task.best_dist:
+        dplt.axhline(sol.task.best_dist)
+    
+    plt.show()
+                
 @operation
 def simulated_annealing(sol, oper=op_greedy_multiple):
     pass
@@ -517,6 +582,7 @@ def build_first(sol):
         #solution_diag(sol)
         #u.checkpoint()
     u.commit()
+    sol.loghist()
 
 @operation
 def print_bottomline(sol):
@@ -531,8 +597,8 @@ def save_solution(sol):
 
 presets = {
     'default': "build_first local_search save_solution".split(),
-    'brief': "build_first local_search print_bottomline save_solution".split(),
-    'initial': "build_first print_like_Czarnas".split()
+    'plt_def': "build_first local_search save_solution plot_history".split(),
+    'plt_inp': "build_first inplace_search plot_history".split(),
 }
 
 # MAIN COMMANDS
@@ -577,7 +643,6 @@ def run_all(args):
 
 def load_solution(f):
     """Unpickle solution from a stream."""
-    import cPickle
     solution_data = cPickle.load(f)
     sol = VrptwSolution(VrptwTask(open(solution_data['filename'])))
     sol.k, sol.dist = solution_data['val']
