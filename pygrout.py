@@ -239,7 +239,8 @@ class VrptwSolution(object):
             val = sol.val(),
             filename = sol.task.filename,
             name = sol.task.name,
-            percentage = sol.percentage() )
+            percentage = sol.percentage(),
+            history = sol.history )
         cPickle.dump(save_data, open(os.path.join(sol.outdir, save_name), 'wb'))
         return sol     
     
@@ -648,15 +649,26 @@ def load_solution(f):
     sol.k, sol.dist = solution_data['val']
     sol.r = solution_data['routes']
     sol.mem = solution_data['mem']
+    try:
+        sol.history = solution_data['history']
+    except: pass    
     if not sol.check_full():
         return None
     return sol
     
 @command
 def load(args):
-    """This time the argument is an opened saved solution."""
+    """Loads a previously saved solution for analysis."""
     sol = load_solution(args.test)
     print_like_Czarnas(sol)
+    print sol.mem
+    try:
+        if len(sol.history):
+            plot_history(sol)
+        else:
+            print "The solution has no history to plot"
+    except ImportError:
+        print "Plotting the history was not possible (missing GUI or matplotlib)"
     
 def get_argument_parser():
     """Create and configure an argument parser.
