@@ -481,8 +481,6 @@ def op_fight_shortest(sol, random = r.random):
         t += (n-rt[R_LEN])/denom
         if t > shot: break
     
-
-
 # OPERATIONS - single solution building blocks
 
 operations = set()
@@ -585,11 +583,11 @@ def solution_diag(sol):
 @operation
 def build_first(sol):
     """Greedily construct the first solution."""
-    # TODO: reset solution for possible reuse.
+    sol.dist = 0
+    sol.k = 0
+    sol.r = []
     for c in sol.task.getSortedCustomers():
         insert_customer(sol, c[ID])
-        #solution_diag(sol)
-        #u.checkpoint()
     u.commit()
     sol.loghist()
 
@@ -680,6 +678,7 @@ def worker(sol, pools, operators, proc_id):
     print "Hello, this is worker", proc_id
     print "This is my solution:"
     print_like_Czarnas(sol)
+    print "My first few random numbers are", [r.random() for i in xrange(15)]
     print "Bye from", proc_id
     
 @command
