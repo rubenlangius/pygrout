@@ -34,13 +34,21 @@ class VrptwTask(object):
     
     # Possible customer ordering (when inserting into initial solution)
     sort_keys = dict(
-        by_timewin_asc  = staticmethod(lambda x: x[B]-x[A]), # ascending TW
+        by_opening = staticmethod(lambda x: x[A]), # by start of TW
+        by_closing = staticmethod(lambda x: x[B]), # by end of TW
+        by_midtime = staticmethod(lambda x: x[A]+x[B]), # by middle of TW
+        by_weight =  staticmethod(lambda x: x[DEM]), # by demand
+        by_opening_desc = staticmethod(lambda x: -x[A]), # by start of TW
+        by_closing_desc = staticmethod(lambda x: -x[B]), # by end of TW
+        by_midtime_desc = staticmethod(lambda x: -x[A]-x[B]), # by middle of TW
+        by_weight_desc =  staticmethod(lambda x: -x[DEM]), # by demand        
+        by_timewin  = staticmethod(lambda x: x[B]-x[A]), # ascending TW
         by_timewin_desc = staticmethod(lambda x: x[A]-x[B]), # descending TW
         by_id           = staticmethod(lambda x: 0),         # unsorted
         by_random_ord   = staticmethod(lambda x: r.random) # random order
     )
 
-    sort_order = sort_keys['by_timewin_asc']
+    sort_order = sort_keys['by_timewin']
     
     def __init__(self, stream):
         lines = stream.readlines()
@@ -219,13 +227,18 @@ class VrptwSolution(object):
             return False
         return True
         
-    def save(sol):
+    def save(sol, extra=None):
         """Dump (pickle) the solution."""
         import uuid
+        # handling unknown percentage (r207.50 and r208.50, actually)
         prec_k, prec_d = map(
             lambda x: "%05.1f" % x if x else 'x'*5, 
             sol.percentage())  
+        # time signature - minutes and seconds (too little?)
         time_sig = "%02d%02d" % divmod(int(time.time())%3600, 60)
+        # additional markers
+        if newer: time_sig += '_n'
+        if not extra is None: time_sig += str(extra)
         node_sig = hex(uuid.getnode())[-4:]
         save_name = "%s-%s-%s-%02d-%05.1f-%s-%s.p" % (
                 sol.task.name, prec_k, prec_d, sol.k, sol.dist, 
@@ -255,7 +268,18 @@ class VrptwSolution(object):
         """Assignment operator - copy essential features from another solution."""
         self.k = rvalue.k
         self.dist = rvalue.dist
-        self.r = cPickle.loads(cPickle.dumps(rvalue.r))
+        self.r = cPickle.loads(cPickle.dumps(rvalue.r, 2))
+        
+    def get_essence(self):
+        """Return the most interesting part of the solution - routes."""
+        return (self.k, self.dist, self.r)
+    
+    def set_essence(self, essence):
+        """Set new routes and value: use with result of get_essence."""
+        self.k, self.dist, self.r = essence
+        
+    def infoline(self):
+        return "(%d, %.2f) (%5.1f%%, %5.1f%%)" % (self.val()+self.percentage())
         
 
 def insert_new(sol, c):
@@ -469,7 +493,7 @@ def op_greedy_multiple(sol, randint = r.randint):
     for c in removed:
         insert_customer(sol, c)
 
-def op_fight_shortest(sol, random = r.random):
+def op_fight_shortest(sol, random=r.random, randint=r.randint):
     """Picks and tries to empty a random route with preference for shortest."""
     shot = random()
     n = sol.task.N
@@ -480,6 +504,13 @@ def op_fight_shortest(sol, random = r.random):
         r += 1
         t += (n-rt[R_LEN])/denom
         if t > shot: break
+    num_removed = min(randint(3, 10), sol.r[r][R_LEN]-1)
+    removed = []
+    for i in xrange(num_removed):
+        removed.append(remove_customer(sol, r, randint(0, sol.r[r][R_LEN]-2)))
+    for c in removed:
+        insert_customer(sol, c)
+    
     
 # OPERATIONS - single solution building blocks
 
@@ -495,7 +526,7 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo):
     oldval = sol.val()
     last_update = 0
     update_count = 0
-    print " ".join([ "(%d, %.2f)" % oldval, "(%5.1f%%, %5.1f%%)" % sol.percentage() ])
+    print sol.infoline()
     start = time.time()
     for j in count(): 
         value_before_batch = sol.val()
@@ -512,8 +543,10 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo):
                 undo()
         elapsed = time.time()-start
         updates = update_count - last_update
-        print " ".join([ "(%d, %.2f)" % oldval, "(%5.1f%%, %5.1f%%)" % sol.percentage(), 
-               "%.1f s, %.2f fps, %d acc (%.2f aps)" % (elapsed, 1000/elapsed, updates, updates/elapsed) ])
+        print " ".join([ 
+          sol.infoline(), 
+          "%.1f s, %.2f fps, %d acc (%.2f aps)" % (
+          elapsed, 1000/elapsed, updates, updates/elapsed) ])
         start = time.time()
         last_update = update_count
         if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-2:
@@ -525,23 +558,10 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo):
     return sol
 
 @operation
-def inplace_search(sol, oper=op_greedy_multiple):
-    """Simple search around a single point."""
-    best = sol.copy()
-    for x in xrange(5000):
-        oper(sol)
-        if sol.val() < best.val():
-            best = sol.copy()
-            sol.loghist()
-        u.undo()
-    print "Starting solution:"
-    print_like_Czarnas(sol)
-    print "Best found solution:"
-    print_like_Czarnas(best)
-    sol.assign(best)
-    sol.loghist()
-    return sol
-   
+def minroute_search(sol):
+    """Rather temporary operation: fight the shortest route."""
+    return local_search(sol, op_fight_shortest)
+    
 @operation
 def plot_history(sol):
     """Display a matplotlib graph of solution progress"""
@@ -592,15 +612,15 @@ def build_first(sol):
     sol.loghist()
 
 @operation
-def save_solution(sol):
-    sol.save()
+def save_solution(sol, extra=None):
+    sol.save(extra)
 
 # OPERATION PRESETS
 
 presets = {
     'default': "build_first local_search save_solution".split(),
-    'plt_def': "build_first local_search save_solution plot_history".split(),
-    'plt_inp': "build_first inplace_search plot_history".split(),
+    'shortest': "build_first minroute_search save_solution".split(),
+    'defplot': "build_first local_search save_solution plot_history".split(),
 }
 
 # MAIN COMMANDS
@@ -618,6 +638,7 @@ def _optimize(test, operations = presets['default']):
     # don't FIXME: should check if this is marked as operation at all?
     for op in operations:
         globals()[op](sol)
+    print(sol.mem)
     return sol
     
 @command
@@ -625,23 +646,25 @@ def optimize(args):
     """Perform optimization of a VRPTW instance according to the arguments."""
     op_list = args.run if args.run else presets[args.preset]
     sol = _optimize(args.test, op_list)
-    print(sol.mem)
     return sol
 
-def _optimize_by_name(fname):
-    return _optimize(open(fname))
+def _optimize_by_name(arg):
+    (fname, operations) = arg
+    return _optimize(open(fname), operations)
     
 @command
 def run_all(args):
     """As optimize, but runs all instances."""
     from glob import glob
     all_tasks = glob(args.glob) * args.runs
+    op_list = args.run if args.run else presets[args.preset]
+    target = [(t, op_list) for t in  all_tasks]
     if args.multi:
         from multiprocessing import Pool
         p = Pool()    
-        p.map(_optimize_by_name, all_tasks)
+        p.map(_optimize_by_name, target)
     else:
-        map(_optimize_by_name, all_tasks)
+        map(_optimize_by_name, target)
 
 def load_solution(f):
     """Unpickle solution from a stream."""
@@ -676,14 +699,13 @@ def load(args):
 def worker(sol, pools, operators, proc_id):
     """The actual working process in a poolchain."""
     print "Hello, this is worker", proc_id
-    #print "This is my solution:"
-    #print_like_Czarnas(sol)
-    print "My (%d) first few random numbers are" % proc_id, [
-            "%.2f"% r.random() for i in xrange(5)]
     r.jumpahead(20000*proc_id)
-    print "My (%d) random numbers after split are" % proc_id, [
-            "%.2f"% r.random() for i in xrange(5)]
-    
+    order = r.choice(VrptwTask.sort_keys.keys())
+    VrptwTask.sort_order = VrptwTask.sort_keys[order]
+    build_first(sol)
+    print "Worker's", proc_id, "result is", sol.infoline()
+    pools[0].put(sol.get_essence())
+    save_solution(sol, proc_id)
     print "Bye from", proc_id
     
 @command
@@ -702,7 +724,15 @@ def poolchain(args):
     workers = [ Process(target=worker, args=(sol, queues, oplist, i))
                 for i in xrange(num_workers) ]
     map(Process.start, workers)
+    for i in xrange(num_workers):
+        k, dist, routes = poison_pills.get()
+        if (k, dist) < sol.val():
+            print "Master accepts better:", k, dist
+            sol.set_essence((k, dist, routes))
+        else:
+            print "Master rejected worse:", k, dist
     map(Process.join, workers)
+    print_like_Czarnas(sol)
     print "This is your master speaking. Workers joined OK."
     
 def get_argument_parser():
