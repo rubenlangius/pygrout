@@ -706,7 +706,7 @@ def worker(sol, pools, operators, proc_id):
     print "Worker's", proc_id, "result is", sol.infoline()
     pools[0].put(sol.get_essence())
     save_solution(sol, proc_id)
-    print "Bye from", proc_id
+    print "Bye from", proc_id, "using", order
     
 @command
 def poolchain(args):
