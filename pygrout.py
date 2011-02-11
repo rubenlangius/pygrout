@@ -37,15 +37,16 @@ class VrptwTask(object):
         by_timewin_asc  = staticmethod(lambda x: x[B]-x[A]), # ascending TW
         by_timewin_desc = staticmethod(lambda x: x[A]-x[B]), # descending TW
         by_id           = staticmethod(lambda x: 0),         # unsorted
-        by_random_ord   = staticmethod(lambda x: Random().random) # random order
+        by_random_ord   = staticmethod(lambda x: r.random) # random order
     )
 
     sort_order = sort_keys['by_timewin_asc']
     
     def __init__(self, stream):
         lines = stream.readlines()
-        self.name = lines[0].strip()
         self.filename = stream.name
+        stream.close()
+        self.name = lines[0].strip()
         self.Kmax, self.capa = map(int, lines[4].split())
         self.cust = [ map(int, x.split()) for x in lines[9:] ]
         import array
@@ -468,9 +469,19 @@ def op_greedy_multiple(sol, randint = r.randint):
     for c in removed:
         insert_customer(sol, c)
 
-def op_fight_shortest(sol):
-    # _, r = min( (sol.r[i][R_LEN], i) for i in xrange(sol.k) )
-    pass
+def op_fight_shortest(sol, random = r.random):
+    """Picks and tries to empty a random route with preference for shortest."""
+    shot = random()
+    n = sol.task.N
+    denom = float(n*(sol.k-1))
+    t = 0
+    r = -1
+    for rt in sol.r:
+        r += 1
+        t += (n-rt[R_LEN])/denom
+        if t > shot: break
+    
+
 
 # OPERATIONS - single solution building blocks
 
@@ -561,10 +572,6 @@ def simulated_annealing(sol, oper=op_greedy_multiple):
     pass
 
 @operation
-def parallel_search(sol):
-    import multiprocessing
-
-@operation
 def solution_diag(sol):
     if not sol.check():
         badroute = dropwhile(sol.check_route, xrange(len(sol.r))).next()
@@ -578,17 +585,13 @@ def solution_diag(sol):
 @operation
 def build_first(sol):
     """Greedily construct the first solution."""
+    # TODO: reset solution for possible reuse.
     for c in sol.task.getSortedCustomers():
         insert_customer(sol, c[ID])
         #solution_diag(sol)
         #u.checkpoint()
     u.commit()
     sol.loghist()
-
-@operation
-def print_bottomline(sol):
-    print "%d %.2f" % (sol.k, sol.dist)
-    return sol
 
 @operation
 def save_solution(sol):
@@ -614,7 +617,7 @@ def command(func):
 def _optimize(test, operations = presets['default']):
     """An optimization funtion, which does not use argparse namespace."""
     sol = VrptwSolution(VrptwTask(test))
-    # TODO: maybe check if this is marked as operation at all ;)
+    # don't FIXME: should check if this is marked as operation at all?
     for op in operations:
         globals()[op](sol)
     return sol
@@ -669,6 +672,34 @@ def load(args):
             print "The solution has no history to plot"
     except ImportError:
         print "Plotting the history was not possible (missing GUI or matplotlib)"
+
+# POOLCHAIN metaheuristic and friends
+
+def worker(sol, pools, operators, proc_id):
+    """The actual working process in a poolchain."""
+    print "Hello, this is worker", proc_id
+    print "This is my solution:"
+    print_like_Czarnas(sol)
+    print "Bye from", proc_id
+    
+@command
+def poolchain(args):
+    """Parallel optimization using a pool of workers and a chain of queues."""
+    from multiprocessing import cpu_count, Process, Queue
+    num_workers = cpu_count()
+    sol = VrptwSolution(VrptwTask(args.test))
+    build_first(sol)
+    poison_pills = Queue()
+    input_ = Queue()
+    output = Queue()
+    queues = [ poison_pills, input_, Queue(), Queue(), output ]
+    oplist = [ None, op_fight_shortest, op_greedy_multiple, 
+               op_greedy_single, None ]
+    workers = [ Process(target=worker, args=(sol, queues, oplist, i))
+                for i in xrange(num_workers) ]
+    map(Process.start, workers)
+    map(Process.join, workers)
+    print "This is your master speaking. Workers joined OK."
     
 def get_argument_parser():
     """Create and configure an argument parser.
