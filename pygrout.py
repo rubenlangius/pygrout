@@ -676,9 +676,14 @@ def load(args):
 def worker(sol, pools, operators, proc_id):
     """The actual working process in a poolchain."""
     print "Hello, this is worker", proc_id
-    print "This is my solution:"
-    print_like_Czarnas(sol)
-    print "My first few random numbers are", [r.random() for i in xrange(15)]
+    #print "This is my solution:"
+    #print_like_Czarnas(sol)
+    print "My (%d) first few random numbers are" % proc_id, [
+            "%.2f"% r.random() for i in xrange(5)]
+    r.jumpahead(20000*proc_id)
+    print "My (%d) random numbers after split are" % proc_id, [
+            "%.2f"% r.random() for i in xrange(5)]
+    
     print "Bye from", proc_id
     
 @command
