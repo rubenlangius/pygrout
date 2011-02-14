@@ -165,7 +165,7 @@ class VrptwSolution(object):
         """Return a tuple of precentage of current solution vs best known."""
         if self.task.best_k:
             return (100.*self.k/self.task.best_k, 100.*self.dist/self.task.best_dist)
-        return (None, None)
+        return (100, 100)
         
     # Shorthands for access to task object.
     def d(self, a, b):
@@ -232,7 +232,7 @@ class VrptwSolution(object):
         import uuid
         # handling unknown percentage (r207.50 and r208.50, actually)
         prec_k, prec_d = map(
-            lambda x: "%05.1f" % x if x else 'x'*5, 
+            lambda x: "%05.1f" % x if sol.task.best_k else 'x'*5, 
             sol.percentage())  
         # time signature - minutes and seconds (too little?)
         time_sig = "%02d%02d" % divmod(int(time.time())%3600, 60)
