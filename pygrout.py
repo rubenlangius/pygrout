@@ -29,26 +29,26 @@ r.seed(r_seed)
 newer = False
 """A flag to portably switch to some newer code where possible."""
 
+# Possible customer ordering (when inserting into initial solution)
+sort_keys = dict(
+    by_opening      = lambda x: x[A], # by start of TW
+    by_closing      = lambda x: x[B], # by end of TW
+    by_midtime      = lambda x: x[A]+x[B], # by middle of TW
+    by_weight       = lambda x: x[DEM], # by demand
+    by_opening_desc = lambda x: -x[A], # by start of TW
+    by_closing_desc = lambda x: -x[B], # by end of TW
+    by_midtime_desc = lambda x: -x[A]-x[B], # by middle of TW
+    by_weight_desc  = lambda x: -x[DEM], # by demand        
+    by_timewin      = lambda x: x[B]-x[A], # ascending TW
+    by_timewin_desc = lambda x: x[A]-x[B], # descending TW
+    by_id           = lambda x: 0,         # unsorted
+    by_random_ord   = lambda x: r.random # random order
+)
+
 class VrptwTask(object):
     """Data loader - holds data of a VRPTW Solomon-formatted test."""
     
-    # Possible customer ordering (when inserting into initial solution)
-    sort_keys = dict(
-        by_opening = staticmethod(lambda x: x[A]), # by start of TW
-        by_closing = staticmethod(lambda x: x[B]), # by end of TW
-        by_midtime = staticmethod(lambda x: x[A]+x[B]), # by middle of TW
-        by_weight =  staticmethod(lambda x: x[DEM]), # by demand
-        by_opening_desc = staticmethod(lambda x: -x[A]), # by start of TW
-        by_closing_desc = staticmethod(lambda x: -x[B]), # by end of TW
-        by_midtime_desc = staticmethod(lambda x: -x[A]-x[B]), # by middle of TW
-        by_weight_desc =  staticmethod(lambda x: -x[DEM]), # by demand        
-        by_timewin  = staticmethod(lambda x: x[B]-x[A]), # ascending TW
-        by_timewin_desc = staticmethod(lambda x: x[A]-x[B]), # descending TW
-        by_id           = staticmethod(lambda x: 0),         # unsorted
-        by_random_ord   = staticmethod(lambda x: r.random) # random order
-    )
-
-    sort_order = sort_keys['by_timewin']
+    sort_order = 'by_timewin'
     
     def __init__(self, stream):
         lines = stream.readlines()
@@ -115,7 +115,7 @@ class VrptwTask(object):
 
     def getSortedCustomers(self):
         """Return customer tuples."""
-        return sorted(self.cust[1:], key=VrptwTask.sort_order)
+        return sorted(self.cust[1:], key=sort_keys[VrptwTask.sort_order])
 
     def load_best(self):
         """Look for saved best solution values in the bestknown/ dir."""
@@ -486,7 +486,7 @@ def op_greedy_single(sol, randint = r.randint):
 def op_greedy_multiple(sol, randint = r.randint):
     """Remove a few customers from a random route and insert them back."""
     r = randint(0, sol.k-1)
-    num_removed = randint(1, min(8, sol.r[r][R_LEN]-1))
+    num_removed = randint(1, min(9, sol.r[r][R_LEN]-1))
     removed = []
     for i in xrange(num_removed):
         removed.append(remove_customer(sol, r, randint(0, sol.r[r][R_LEN]-2)))
@@ -521,7 +521,7 @@ def operation(func):
     return func
 
 @operation
-def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo):
+def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, steps=100, rounds=None):
     """Optimize solution by local search."""
     oldval = sol.val()
     last_update = 0
@@ -529,8 +529,11 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo):
     print sol.infoline()
     start = time.time()
     for j in count(): 
+        # check limit of rounds
+        if rounds and j >= rounds:
+            break
         value_before_batch = sol.val()
-        for x in xrange(1000):
+        for x in xrange(steps):
             oper(sol)
             if sol.val() < oldval:
                 oldval = sol.val()
@@ -546,12 +549,12 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo):
         print " ".join([ 
           sol.infoline(), 
           "%.1f s, %.2f fps, %d acc (%.2f aps)" % (
-          elapsed, 1000/elapsed, updates, updates/elapsed) ])
+          elapsed, steps/elapsed, updates, updates/elapsed) ])
         start = time.time()
         last_update = update_count
         if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-2:
-            print( "No further changes. Quitting after %dx1000." % (j+1,))
-            sol.mem['iterations'] = 1000*(j+1)
+            print( "No further changes. Quitting after %dx%d." % (j+1,steps))
+            sol.mem['iterations'] = steps*(j+1)
             sol.mem['improvements'] = update_count
             break
     sol.loghist()
@@ -608,6 +611,7 @@ def build_first(sol):
     sol.r = []
     for c in sol.task.getSortedCustomers():
         insert_customer(sol, c[ID])
+    sol.mem['init_order'] = VrptwTask.sort_order
     u.commit()
     sol.loghist()
 
@@ -656,6 +660,7 @@ def _optimize_by_name(arg):
 def run_all(args):
     """As optimize, but runs all instances."""
     from glob import glob
+    runs = args.runs or 1
     all_tasks = glob(args.glob) * args.runs
     op_list = args.run if args.run else presets[args.preset]
     target = [(t, op_list) for t in  all_tasks]
@@ -698,42 +703,91 @@ def load(args):
 
 def worker(sol, pools, operators, proc_id):
     """The actual working process in a poolchain."""
+    import Queue as q
+    from multiprocessing import Queue
     print "Hello, this is worker", proc_id
     r.jumpahead(20000*proc_id)
-    order = r.choice(VrptwTask.sort_keys.keys())
-    VrptwTask.sort_order = VrptwTask.sort_keys[order]
-    build_first(sol)
-    print "Worker's", proc_id, "result is", sol.infoline()
-    pools[0].put(sol.get_essence())
-    save_solution(sol, proc_id)
-    print "Bye from", proc_id, "using", order
+    while True:
+        # check pill
+        try:
+            pill = pools[0].get_nowait()
+            print "Worker", proc_id, "got poisoned... Saving my solution for now."
+            save_solution(sol, "_pcw%d" % proc_id)
+            break
+        except q.Empty:
+            pass
+        
+        # fish in the the pool
+        try:
+            new_essence = pools[1].get_nowait()
+            sol.set_essence(new_essence)
+            # pools[1].task_done()
+        except q.Empty:
+            # if nothing to take - produce new one
+            order = r.choice(sort_keys.keys())
+            VrptwTask.sort_order = order
+            build_first(sol)
+            print "Worker", proc_id, "produced new:", sol.infoline()
+        
+        # run optimization 
+        local_search(sol, operators[1], rounds=5)
+        
+        # throw the solution back to the pool
+        pools[2].put(sol.get_essence())
+    # declare not to do any more output
+    # pools[2].close()
     
 @command
 def poolchain(args):
     """Parallel optimization using a pool of workers and a chain of queues."""
     from multiprocessing import cpu_count, Process, Queue
-    num_workers = cpu_count()
+    # create own solution object (for being inherited)
     sol = VrptwSolution(VrptwTask(args.test))
     build_first(sol)
+    # setup the queues
     poison_pills = Queue()
     input_ = Queue()
     output = Queue()
-    queues = [ poison_pills, input_, Queue(), Queue(), output ]
-    oplist = [ None, op_fight_shortest, op_greedy_multiple, 
-               op_greedy_single, None ]
+    queues = [ poison_pills, input_, output ]
+    oplist = [ None, op_greedy_multiple, None ]
+    # create and launch the workers
+    num_workers = args.runs or cpu_count()
     workers = [ Process(target=worker, args=(sol, queues, oplist, i))
                 for i in xrange(num_workers) ]
     map(Process.start, workers)
+    # manage the pool for a while (now - simply feed them back)
+    time_to_die = time.time()+args.wall
+    while time.time() < time_to_die:
+        essence = output.get()
+        #output.task_done()
+        input_.put(essence)
+        
+    print "Wall time passed"
     for i in xrange(num_workers):
-        k, dist, routes = poison_pills.get()
+        poison_pills.put(0)
+    
+    print "Pills sent, waiting for marauders"
+    map(Process.join, workers)
+    
+    print "Workers joined OK. Gathering solutions."
+    def check_betterness(sol, essence):
+        k, dist, routes = essence
         if (k, dist) < sol.val():
             print "Master accepts better:", k, dist
             sol.set_essence((k, dist, routes))
         else:
             print "Master rejected worse:", k, dist
-    map(Process.join, workers)
+        
+    while not output.empty():
+        check_betterness(sol, output.get())
+
+    while not input_.empty():
+        check_betterness(sol, input_.get())
+    
+    print "Best solution chosen. Saving."
+    
+    save_solution(sol, '_pc') # suffix for poolchain
     print_like_Czarnas(sol)
-    print "This is your master speaking. Workers joined OK."
     
 def get_argument_parser():
     """Create and configure an argument parser.
@@ -748,7 +802,7 @@ def get_argument_parser():
             "command", choices=commands, nargs="?", default="optimize",
             help="main command to execute")
         parser.add_argument(
-            "test", type=file, nargs='?', default='solomons/c101.txt',
+            "test", type=file, nargs='?', default='hombergers/rc210_1.txt',
             help="the test instance: txt format as by M. Solomon")
         parser.add_argument(
             "--run", "-e", choices=operations, action="append",
@@ -757,7 +811,7 @@ def get_argument_parser():
             "--preset", choices=presets.keys(), default="default",
             help="choose a preset of operations (for optimize command)")
         parser.add_argument(
-            "--runs", "-n", type=int, default=1,
+            "--runs", "-n", type=int, default=0,
             help="repeat (e.g. optimization) n times, or use n processes")
         parser.add_argument(
             "--multi", "-p", action="store_true",
@@ -765,6 +819,9 @@ def get_argument_parser():
         parser.add_argument(
             "--glob", "-g", default="hombergers/*.txt",
             help="glob expression for run_all, defaults to all H")
+        parser.add_argument(
+            "--wall", "-w", type=int, default=600,
+            help="approximate walltime (real) in seconds")
     
         class OptionAction(Action):
             """A dispatching action for option parser - global configs"""
@@ -773,7 +830,7 @@ def get_argument_parser():
                 if option_string in ['-o', '--output']:
                     VrptwSolution.outdir = values
                 elif option_string == '--order':
-                    VrptwTask.sort_order = VrptwTask.sort_keys[values]
+                    VrptwTask.sort_order = values
                 elif option_string in ['-s', '--seed']:
                     global r_seed
                     r_seed = int(values)
@@ -788,8 +845,7 @@ def get_argument_parser():
             help="output directory for saving solutions")
         
         parser.add_argument(
-            "--order", action=OptionAction,
-            choices=VrptwTask.sort_keys.keys(),
+            "--order", action=OptionAction, choices=sort_keys.keys(),
             help="choose specific order for initial customers")
         
         parser.add_argument(
