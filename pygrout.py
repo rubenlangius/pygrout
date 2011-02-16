@@ -51,6 +51,7 @@ class VrptwTask(object):
     sort_order = 'by_timewin'
     
     def __init__(self, stream):
+        if type(stream)==str: stream = open(stream)
         lines = stream.readlines()
         self.filename = stream.name
         stream.close()
@@ -167,6 +168,47 @@ class VrptwSolution(object):
             return (100.*self.k/self.task.best_k, 100.*self.dist/self.task.best_dist)
         return (100, 100)
         
+    def flatten(self):
+        """Make a string representation of the solution for grout program."""
+        return "\n".join( 
+            ["%d %f" % (self.k, self.dist)] +
+            # E_TOW, i.e. edge targets
+            [" ".join(str(e[1]) for e in rt[R_EDG]) for rt in self.r] + ['0'])
+    
+    def inflate(self, data):
+        """Decode and recalculate routes from a string by flatten()."""
+        # forget everything now:
+        u.commit()
+        # trusting the saved values
+        lines = data.split("\n")
+        k, dist = lines[0].split()
+        self.k = int(k); self.dist = float(dist)
+        # constructing routes
+        self.r = []
+        dist_glob = 0
+        d = self.task.dist
+        t = self.task.time
+        cust = self.task.cust
+        for l in xrange(1, len(lines)-1):
+            customers = map(int, lines[l].split())
+            edges = []
+            load = 0
+            dist = 0
+            a = 0
+            arr_a = 0
+            for b in customers:
+                edges.append([a, b, arr_a, 0])
+                load += cust[b][DEM]
+                dist += d[a][b]
+                arr_a = max(arr_a+t[a][b], cust[b][A])
+                a = b
+            # set latest arrivat to depot, for propagating later
+            edges[-1][3] = cust[0][B] 
+            self.r.append([ len(customers), load, dist, edges ])
+            propagate_deadline(self, -1, len(customers)-1)
+            dist_glob += dist
+        self.dist = dist_glob
+                
     # Shorthands for access to task object.
     def d(self, a, b):
         return self.task.dist[a][b]
@@ -256,6 +298,7 @@ class VrptwSolution(object):
             percentage = sol.percentage(),
             history = sol.history )
         cPickle.dump(save_data, open(os.path.join(sol.outdir, save_name), 'wb'))
+        open(os.path.join(sol.outdir, save_name.replace('.p', '.vrp')), 'w').write(sol.flatten())
         return sol     
     
     def copy(self):
