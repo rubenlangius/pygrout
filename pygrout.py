@@ -521,9 +521,10 @@ def operation(func):
     return func
 
 @operation
-def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, steps=100, rounds=None):
+def local_search(sol, oper=op_greedy_multiple, steps=100, rounds=None):
     """Optimize solution by local search."""
-    oldval = sol.val()
+    ci=u.commit; undo=u.undo; val=sol.val # local rebinds
+    oldval = val()
     last_update = 0
     update_count = 0
     print sol.infoline()
@@ -535,12 +536,12 @@ def local_search(sol, oper=op_greedy_multiple, ci=u.commit, undo=u.undo, steps=1
         value_before_batch = sol.val()
         for x in xrange(steps):
             oper(sol)
-            if sol.val() < oldval:
-                oldval = sol.val()
+            if val() < oldval:
+                oldval = val()
                 update_count += 1
                 sol.loghist()
                 ci()
-            elif sol.val() == oldval:
+            elif val() == oldval:
                 ci()
             else:
                 undo()
@@ -711,8 +712,9 @@ def worker(sol, pools, operators, proc_id):
         # check pill
         try:
             pill = pools[0].get_nowait()
-            print "Worker", proc_id, "got poisoned... Saving my solution for now."
-            save_solution(sol, "_pcw%d" % proc_id)
+            print "Worker", proc_id, "got poisoned..."
+            # Saving my solution for now."
+            # save_solution(sol, "_pcw%d" % proc_id)
             break
         except q.Empty:
             pass
@@ -721,6 +723,7 @@ def worker(sol, pools, operators, proc_id):
         try:
             new_essence = pools[1].get_nowait()
             sol.set_essence(new_essence)
+            print "Worker", proc_id, "got job:", sol.infoline()
             # pools[1].task_done()
         except q.Empty:
             # if nothing to take - produce new one
@@ -730,65 +733,99 @@ def worker(sol, pools, operators, proc_id):
             print "Worker", proc_id, "produced new:", sol.infoline()
         
         # run optimization 
-        local_search(sol, operators[1], rounds=5)
+        local_search(sol, operators[1], rounds=1, steps=10)
         
         # throw the solution back to the pool
         pools[2].put(sol.get_essence())
+    # endwhile:
     # declare not to do any more output
-    # pools[2].close()
+    pools[2].put((proc_id, 0, 0))
+    print "Worker", proc_id, "should now finish."
     
 @command
 def poolchain(args):
     """Parallel optimization using a pool of workers and a chain of queues."""
+    import Queue as q
     from multiprocessing import cpu_count, Process, Queue
-    # create own solution object (for being inherited)
+    # create own solution object (for test data being inherited)
+    began = time.time()
     sol = VrptwSolution(VrptwTask(args.test))
-    build_first(sol)
+    
     # setup the queues
     poison_pills = Queue()
     input_ = Queue()
     output = Queue()
     queues = [ poison_pills, input_, output ]
     oplist = [ None, op_greedy_multiple, None ]
+    
     # create and launch the workers
     num_workers = args.runs or cpu_count()
     workers = [ Process(target=worker, args=(sol, queues, oplist, i))
                 for i in xrange(num_workers) ]
     map(Process.start, workers)
+    
+    # get a solution from the fastest worker (we have to service them...
+    essence = output.get()
+    input_.put(essence)
+    sol.set_essence(essence)
+    
     # manage the pool for a while (now - simply feed them back)
     time_to_die = time.time()+args.wall
     while time.time() < time_to_die:
         essence = output.get()
-        #output.task_done()
         input_.put(essence)
         
     print "Wall time passed"
     for i in xrange(num_workers):
         poison_pills.put(0)
     
-    print "Pills sent, waiting for marauders"
-    map(Process.join, workers)
+    print "Pills sent, now will collect solutions"            
     
-    print "Workers joined OK. Gathering solutions."
-    def check_betterness(sol, essence):
-        k, dist, routes = essence
-        if (k, dist) < sol.val():
-            print "Master accepts better:", k, dist
-            sol.set_essence((k, dist, routes))
+    while num_workers > 0:
+        k, dist, routes = output.get()
+        if routes == 0:
+            num_workers -= 1
+            print "Worker's",k,"pill-box received"
         else:
-            print "Master rejected worse:", k, dist
-        
-    while not output.empty():
-        check_betterness(sol, output.get())
+            if (k, dist) < sol.val():
+                sol.set_essence((k, dist, routes))
+            print 'got out from output: ', k, dist
 
-    while not input_.empty():
-        check_betterness(sol, input_.get())
+    print "Staff is to join: so much are alive:"
+    print map(Process.is_alive, workers)
+
+    print input_.qsize(), 'solutions still in queue 1'
+    try:
+        while True:
+            # print "Waiting for a solution"
+            k, dist, routes = input_.get(timeout=0.5)
+            if (k, dist) < sol.val():
+                sol.set_essence((k, dist, routes))
+            print 'got out: ', k, dist
+    except q.Empty:
+        pass
+    
+    try:
+        poison_pills.get(timeout=0.5)
+    except q.Empty:
+        pass
+    else:
+        print "Possible rubbish in poison_pills"
+
+    try:
+        output.get(timeout=0.5)
+    except q.Empty:
+        pass
+    else:
+        print "Possible rubbish in output"
     
     print "Best solution chosen. Saving."
-    
+    print sol.infoline()
     save_solution(sol, '_pc') # suffix for poolchain
     print_like_Czarnas(sol)
-    
+
+
+
 def get_argument_parser():
     """Create and configure an argument parser.
     Used by main function; may be used for programmatic access."""
@@ -799,7 +836,7 @@ def get_argument_parser():
             description="Optimizing VRPTW instances with some heuristics")
             
         parser.add_argument(
-            "command", choices=commands, nargs="?", default="optimize",
+            "command", choices=commands, nargs="?", default="poolchain",
             help="main command to execute")
         parser.add_argument(
             "test", type=file, nargs='?', default='hombergers/rc210_1.txt',
