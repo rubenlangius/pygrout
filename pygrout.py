@@ -3,6 +3,8 @@
 from math import hypot
 from random import Random
 from itertools import count, izip, dropwhile
+from collections import deque
+
 import sys
 import os
 import time
@@ -173,7 +175,7 @@ class VrptwSolution(object):
         return "\n".join( 
             ["%d %f" % (self.k, self.dist)] +
             # E_TOW, i.e. edge targets
-            [" ".join(str(e[1]) for e in rt[R_EDG]) for rt in self.r] + ['0'])
+            [" ".join(str(e[1]) for e in rt[R_EDG]) for rt in self.r] + ['0\n'])
     
     def inflate(self, data):
         """Decode and recalculate routes from a string by flatten()."""
@@ -547,13 +549,16 @@ def op_fight_shortest(sol, random=r.random, randint=r.randint):
         r += 1
         t += (n-rt[R_LEN])/denom
         if t > shot: break
-    num_removed = min(randint(3, 10), sol.r[r][R_LEN]-1)
+    num_removed = min(randint(1, 10), sol.r[r][R_LEN]-1)
     removed = []
     for i in xrange(num_removed):
         removed.append(remove_customer(sol, r, randint(0, sol.r[r][R_LEN]-2)))
     for c in removed:
         insert_customer(sol, c)
     
+def op_route_min():
+    """Emulate the route minimization (RM) heuristic by Nagata et al."""
+    u.checkpoint()
     
 # OPERATIONS - single solution building blocks
 
@@ -564,43 +569,36 @@ def operation(func):
     return func
 
 @operation
-def local_search(sol, oper=op_greedy_multiple, steps=100, rounds=None):
+def local_search(sol, oper=op_greedy_multiple, end=0, verb=False):
     """Optimize solution by local search."""
-    ci=u.commit; undo=u.undo; val=sol.val # local rebinds
+    # local rebinds
+    ci=u.commit; undo=u.undo; val=sol.val 
     oldval = val()
-    last_update = 0
-    update_count = 0
-    print sol.infoline()
-    start = time.time()
-    for j in count(): 
-        # check limit of rounds
-        if rounds and j >= rounds:
-            break
-        value_before_batch = sol.val()
-        for x in xrange(steps):
-            oper(sol)
-            if val() < oldval:
-                oldval = val()
-                update_count += 1
-                sol.loghist()
-                ci()
-            elif val() == oldval:
-                ci()
-            else:
-                undo()
-        elapsed = time.time()-start
-        updates = update_count - last_update
-        print " ".join([ 
-          sol.infoline(), 
+    from time import time
+    # stats
+    updates = 0
+    steps = 0
+    start = time()
+    if end == 0:
+        end = time()+3
+    while time() < end:
+        steps += 1
+        oper(sol)
+        newval = val()
+        if  newval < oldval:
+            oldval = newval
+            updates += 1
+            sol.loghist()
+            ci()
+        elif val() == oldval:
+            ci()
+        else:
+            undo()
+    elapsed = time()-start
+    if verb:
+        print " ".join([ sol.infoline(), 
           "%.1f s, %.2f fps, %d acc (%.2f aps)" % (
           elapsed, steps/elapsed, updates, updates/elapsed) ])
-        start = time.time()
-        last_update = update_count
-        if value_before_batch[0] == oldval[0] and abs(value_before_batch[1]-oldval[1])< 1e-2:
-            print( "No further changes. Quitting after %dx%d." % (j+1,steps))
-            sol.mem['iterations'] = steps*(j+1)
-            sol.mem['improvements'] = update_count
-            break
     sol.loghist()
     return sol
 
@@ -741,16 +739,22 @@ def load(args):
         else:
             print "The solution has no history to plot"
     except ImportError:
-        print "Plotting the history was not possible (missing GUI or matplotlib)"
+        print "Plotting history impossible (missing GUI or matplotlib)"
 
 # POOLCHAIN metaheuristic and friends
 
-def worker(sol, pools, operators, proc_id):
+def worker(sol, pools, operators, proc_id, size, intvl):
     """The actual working process in a poolchain."""
     import Queue as q
     from multiprocessing import Queue
-    print "Hello, this is worker", proc_id
+    
+    print "Worker launched, id:", proc_id
+    # disperse workers' random nubmer generators
     r.jumpahead(20000*proc_id)
+    # disperse workers' feedback a bit (actually: random)
+    next_feedback = time.time() + (proc_id+1)*intvl
+    num_produced = 0
+    
     while True:
         # check pill
         try:
@@ -762,38 +766,43 @@ def worker(sol, pools, operators, proc_id):
         except q.Empty:
             pass
         
-        # fish in the the pool
+        # choose solution to work on this round
         try:
+            # fish in the the pool
             new_essence = pools[1].get_nowait()
             sol.set_essence(new_essence)
             print "Worker", proc_id, "got job:", sol.infoline()
-            # pools[1].task_done()
         except q.Empty:
-            # if nothing to take - produce new one
-            order = r.choice(sort_keys.keys())
-            VrptwTask.sort_order = order
-            build_first(sol)
-            print "Worker", proc_id, "produced new:", sol.infoline()
+            # if nothing to take - produce new one or keep current
+            if num_produced < 5 or r.random() < 4.0/num_produced:
+                order = r.choice(sort_keys.keys())
+                VrptwTask.sort_order = order
+                build_first(sol)
+                print("Worker %d produced new: %s by %s" % 
+                      (proc_id, sol.infoline(), order))
+            # else: go on with current
         
         # run optimization 
-        local_search(sol, operators[1], rounds=1, steps=10)
+        local_search(sol, operators[1], next_feedback, )
+        next_feedback = time.time() + intvl*(size+1)
         
         # throw the solution back to the pool
         pools[2].put(sol.get_essence())
     # endwhile:
     # declare not to do any more output
     pools[2].put((proc_id, 0, 0))
-    print "Worker", proc_id, "should now finish."
+    # print "Worker", proc_id, "should now finish."
     
 @command
 def poolchain(args):
     """Parallel optimization using a pool of workers and a chain of queues."""
     import Queue as q
     from multiprocessing import cpu_count, Process, Queue
+    from bisect import bisect_left
+    
     # create own solution object (for test data being inherited)
     began = time.time()
     sol = VrptwSolution(VrptwTask(args.test))
-    
     # setup the queues
     poison_pills = Queue()
     input_ = Queue()
@@ -803,22 +812,62 @@ def poolchain(args):
     
     # create and launch the workers
     num_workers = args.runs or cpu_count()
-    workers = [ Process(target=worker, args=(sol, queues, oplist, i))
-                for i in xrange(num_workers) ]
+    workers = [ Process(
+        target=worker, args=(sol, queues, oplist, i, num_workers, args.intvl))
+        for i in xrange(num_workers) ]
     map(Process.start, workers)
     
-    # get a solution from the fastest worker (we have to service them...
+    # get a solution from the fastest worker (we have to service them...)
+    print "Master waits for first solution..."
     essence = output.get()
     input_.put(essence)
     sol.set_essence(essence)
+    print "Got first solution:", sol.infoline(), "after", time.time()-began 
+
+    # the discriminators of the solution circulation
+    best_seen_k = essence[0]
+    best_essncs = [essence]
+    
+    if best_seen_k == sol.task.best_k:
+        print "Best known route count immediately:", time.time()-began
+        sol.mem['best_k_found'] = time.time()-began
+        if args.strive:
+            args.wall /= 5.0
+            print "Wall time reduced to:", args.wall
     
     # manage the pool for a while (now - simply feed them back)
     time_to_die = time.time()+args.wall
+    # ---- START OF MAIN LOOP ----
     while time.time() < time_to_die:
         essence = output.get()
-        input_.put(essence)
-        
-    print "Wall time passed"
+        # drop solutions worse than best_seen_k+1
+        if essence[0] <= best_seen_k+1:
+            # -- check for route count record
+            if best_seen_k > essence[0]:
+                best_seen_k = essence[0]
+                if best_seen_k == sol.task.best_k:
+                    print "Best known route count reached:", time.time()-began
+                    sol.mem['best_k_found'] = time.time()-began
+                    if args.strive and time_to_die > time.time()+args.wall/5.0:
+                        time_to_die = time.time()+args.wall/5.0
+                        print "Remaining time reduced to:", args.wall/5.0
+            # -- check against pool
+            pos = bisect_left(best_essncs, essence)            
+            if ( len(best_essncs)<15 
+                or (pos < 15 and best_essncs[pos][:2] <> essence[:2]) ):
+                # this solution is ok - pay it forward
+                input_.put(essence)
+                best_essncs.insert(pos, essence)
+                if len(best_essncs) > 15:
+                    best_essncs.pop()
+            else:
+                # throw in one of the elite solutions
+                input_.put(r.choice(best_essncs))
+        elif r.random() < 0.5:
+            # if solution was bad (route count), maybe throw in old 
+            input_.put(r.choice(best_essncs))
+    # ---- END OF MAIN LOOP ----
+    print "Wall time passed, after:", time.time()-began
     for i in xrange(num_workers):
         poison_pills.put(0)
     
@@ -828,7 +877,7 @@ def poolchain(args):
         k, dist, routes = output.get()
         if routes == 0:
             num_workers -= 1
-            print "Worker's",k,"pill-box received"
+            print "Worker's",k,"pill-box received", time.time()-began
         else:
             if (k, dist) < sol.val():
                 sol.set_essence((k, dist, routes))
@@ -841,7 +890,7 @@ def poolchain(args):
     try:
         while True:
             # print "Waiting for a solution"
-            k, dist, routes = input_.get(timeout=0.5)
+            k, dist, routes = input_.get(timeout=0.3)
             if (k, dist) < sol.val():
                 sol.set_essence((k, dist, routes))
             print 'got out: ', k, dist
@@ -849,25 +898,26 @@ def poolchain(args):
         pass
     
     try:
-        poison_pills.get(timeout=0.5)
+        poison_pills.get(timeout=0.1)
     except q.Empty:
         pass
     else:
         print "Possible rubbish in poison_pills"
 
     try:
-        output.get(timeout=0.5)
+        output.get(timeout=0.1)
     except q.Empty:
         pass
     else:
         print "Possible rubbish in output"
     
-    print "Best solution chosen. Saving."
-    print sol.infoline()
+    print "Best solution chosen. Saving.", time.time()-began
     save_solution(sol, '_pc') # suffix for poolchain
     print_like_Czarnas(sol)
-
-
+    print sol.infoline()
+    
+    #map(Process.join, workers)
+    print "Total time elapsed:", time.time()-began
 
 def get_argument_parser():
     """Create and configure an argument parser.
@@ -896,10 +946,17 @@ def get_argument_parser():
         parser.add_argument(
             "--glob", "-g", default="hombergers/*.txt",
             help="glob expression for run_all, defaults to all H")
+            
         parser.add_argument(
             "--wall", "-w", type=int, default=600,
             help="approximate walltime (real) in seconds")
-
+        parser.add_argument(
+            "--intvl", type=int, default=3,
+            help="approximate refresh rate (delay between messages")
+        parser.add_argument(
+            "--strive", action="store_true",
+            help="run for best known route count, and then only short")
+                    
         parser.add_argument(
             "--multi", "-p", action="store_true",
             help="use multiprocessing for parallelism e.g. with run_all")
