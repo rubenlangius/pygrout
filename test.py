@@ -4,7 +4,7 @@
 try:
     import numpy
 except: 
-    numpy = type('dummy', (object,), dict(float64=float))
+    numpy = type('dummy', (object,), dict(float64=float))()
 
 def _rec_assert_simmilar(a, b):
     assert type(a)==type(b), 'wrong types: %s and %s' % (type(a), type(b))

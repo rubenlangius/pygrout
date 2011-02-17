@@ -879,11 +879,11 @@ def get_argument_parser():
             description="Optimizing VRPTW instances with some heuristics")
             
         parser.add_argument(
-            "command", choices=commands, nargs="?", default="poolchain",
-            help="main command to execute")
-        parser.add_argument(
             "test", type=file, nargs='?', default='hombergers/rc210_1.txt',
             help="the test instance: txt format as by M. Solomon")
+        parser.add_argument(
+            "command", choices=commands, nargs="?", default="poolchain",
+            help="main command to execute")
         parser.add_argument(
             "--run", "-e", choices=operations, action="append",
             help="perform specific available operation on the solution")
@@ -894,14 +894,18 @@ def get_argument_parser():
             "--runs", "-n", type=int, default=0,
             help="repeat (e.g. optimization) n times, or use n processes")
         parser.add_argument(
-            "--multi", "-p", action="store_true",
-            help="use multiprocessing for parallelism e.g. with run_all")
-        parser.add_argument(
             "--glob", "-g", default="hombergers/*.txt",
             help="glob expression for run_all, defaults to all H")
         parser.add_argument(
             "--wall", "-w", type=int, default=600,
             help="approximate walltime (real) in seconds")
+
+        parser.add_argument(
+            "--multi", "-p", action="store_true",
+            help="use multiprocessing for parallelism e.g. with run_all")
+        parser.add_argument(
+            "--prof", action="store_true",
+            help="profile the code (don't do that), 10x slower")
     
         class OptionAction(Action):
             """A dispatching action for option parser - global configs"""
@@ -937,16 +941,17 @@ def get_argument_parser():
         print "Install argparse module"
         raise
 
-def main():
+def main(can_profile = False):
     """Entry point when this module is ran at top-level."""
-    parser = get_argument_parser()
-    args = parser.parse_args()
-    global newer
-    if args.newer:
-        newer = True
+    args = get_argument_parser().parse_args()
+    if can_profile and args.prof:
+        import cProfile
+        args.test.close()
+        cProfile.run('main()', 'profile.bin')
+        return
     # execute the selected command
     globals()[args.command](args)
 
 if __name__ == '__main__':
-    main()
+    main(True)
     
