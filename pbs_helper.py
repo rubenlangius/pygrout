@@ -114,7 +114,9 @@ def main():
     
     command = 'qsub %s -N %s' % (pbs_opts, job_name)
     
-    print "About to pipe: \n%s\n to the command: \n%s\n\nPress Enter"
+    print "About to pipe: \n%s\n to the command: \n%s\n\nPress Enter" % (
+        script, command)
+        
     raw_input()
     
     pipe = Popen(command, shell=True, stdin=PIPE).stdin
