@@ -110,7 +110,7 @@ def main():
     for i in %s; do
     ./pygrout %s $i
     done
-    """ % (getcwd(), tasks, pygroupts)
+    """ % (getcwd(), tasks, pygrout_opts)
     
     command = 'qsub %s -N %s' % (pbs_opts, job_name)
     
