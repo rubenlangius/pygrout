@@ -590,7 +590,8 @@ def local_search(sol, oper=op_greedy_multiple, end=0, verb=False):
             updates += 1
             sol.loghist()
             ci()
-        elif val() == oldval:
+        elif val()[0] == oldval[0]:
+            # huh, not worse, when it comes to routes
             ci()
         else:
             undo()
