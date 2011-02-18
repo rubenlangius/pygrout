@@ -93,18 +93,7 @@ def smart_input(prompt, history=None, suggestions=[], info=None):
         
     return result
     
-def main():
-    from os import getcwd
-    from subprocess import Popen, PIPE
-    
-    job_name = smart_input('Job name', 'output/.pbs/jobname',['poolchain'])
-    pbs_opts = smart_input('PBS options', 'output/.pbs/options', 
-        ['-l nodes=1:nehalem -l walltime=20000'])
-    tasks = smart_input('Tasks [glob pattern]', 'output/.pbs/tasks', 
-        ['solomons/', 'hombergers/', 'hombergers/*_2??.txt'])
-    pygrout_opts = smart_input('pygrout options', 'output/.pbs/pygroupts', 
-        ['--strive --wall 600', '--wall '])
-         
+def run_job(job_name, pbs_opts, tasks, pygrout_opts):
     script = """
     cd %s
     pwd
@@ -124,6 +113,20 @@ def main():
     pipe = Popen(command, shell=True, stdin=PIPE).stdin
     pipe.write(script)
     pipe.close()
+
+def main():
+    from os import getcwd
+    from subprocess import Popen, PIPE
+    
+    job_name = smart_input('Job name', 'output/.pbs/jobname',['poolchain'])
+    pbs_opts = smart_input('PBS options', 'output/.pbs/options', 
+        ['-l nodes=1:nehalem -l walltime=20000'])
+    tasks = smart_input('Tasks [glob pattern]', 'output/.pbs/tasks', 
+        ['solomons/', 'hombergers/', 'hombergers/*_2??.txt'])
+    pygrout_opts = smart_input('pygrout options', 'output/.pbs/pygroupts', 
+        ['--strive --wall 600', '--wall '])
+         
+    run_job(job_name, pbs_opts, tasks, pygrout_opts)
     
 if __name__ == '__main__':
     main()
