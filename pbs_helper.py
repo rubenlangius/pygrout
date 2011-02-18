@@ -99,16 +99,18 @@ def main():
     
     job_name = smart_input('Job name', 'output/.pbs/jobname',['poolchain'])
     pbs_opts = smart_input('PBS options', 'output/.pbs/options', 
-        ['-l nodes=1:nehalem -l walltime='])
+        ['-l nodes=1:nehalem -l walltime=20000'])
     tasks = smart_input('Tasks [glob pattern]', 'output/.pbs/tasks', 
-        ['solomons/????.txt solomons/?????.txt', 'hombergers/*_2??.txt'])
+        ['solomons/', 'hombergers/', 'hombergers/*_2??.txt'])
     pygrout_opts = smart_input('pygrout options', 'output/.pbs/pygroupts', 
-        ['--strive --wall ', '--wall '])
+        ['--strive --wall 600', '--wall '])
          
     script = """
     cd %s
+    pwd
     for i in %s; do
-    ./pygrout %s $i
+    ./pygrout.py %s $i
+    date
     done
     """ % (getcwd(), tasks, pygrout_opts)
     
