@@ -299,6 +299,8 @@ class VrptwSolution(object):
             name = sol.task.name,
             percentage = sol.percentage(),
             history = sol.history )
+        if not os.path.exists(sol.outdir):
+            os.makedirs(sol.outdir)
         cPickle.dump(save_data, open(os.path.join(sol.outdir, save_name), 'wb'))
         open(os.path.join(sol.outdir, save_name.replace('.p', '.vrp')), 'w').write(sol.flatten())
         return sol     
