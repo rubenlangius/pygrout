@@ -10,20 +10,69 @@ cutoff = re.compile('-.*')
 
 def find_medium(test):
     """Glob and return all but the 'smallest' and 'largest' files."""
-    return sorted(glob.glob(test+'*.p'))[1:-1]
+    # missing case-insensitive glob. Besides, this Solomon's mess
+    # with capital C, R and RC might be worth cleaning up...
+    return sorted(glob.glob(test+'*.p')+glob.glob(test.upper()+'*.p'))[1:-1]
+
+def read_as_set(f):
+    """Read the file and return set of lines."""
+    return set(map(str.strip, open(f)))
+
+def printf(set_):
+    """Used to display a set, with count, sorted and textwrapped."""
+    print "(%d)"%len(set_)
+    print textwrap.fill(" ".join(sorted(set_)))
+
+def compare(*args):
+    """Read in the passed files and display differences."""
+    if len(args) < 2:
+        print "Provide at least two filenames to compare."
+        return
+    if len(args) > 2:
+        print "Warning: only 2 files work now."
+    first, secnd = map(read_as_set, args[:2])
+    print "Only in%s:" % args[1]
+    printf(first.difference(secnd))
+    print "Only in %s:" % args[2]
+    printf(secnd.difference(first))
+    print "In both:"
+    printf(first.intersection(secnd))    
+    
+def union(*args):
+    """Read in the passed files and display the union (set sum)."""
+    
+    # helpers (maybe later global)
+    
+    def sel_solomons(set_):
+        """Select Solomon test names (only full 100 customer)."""
+        return set(filter(re.compile('r?c?\d{3}$').match, set_))
+
+    def sel_homberger(set_):
+        """Select Solomon test names (only full 100 customer)."""
+        return set(filter(re.compile('r?c?[0-9_]{5}$').match, set_))
+    
+    if len(args) < 1:
+        print "Provide at least two filenames to add together."
+        return
+        
+    sets = map(read_as_set, args)
+    sum_of_all = set.union(*sets)
+    print "All found results are:"
+    printf(sum_of_all)
+    print "Including junk:"
+    printf(sum_of_all.difference(
+        sel_solomons(sum_of_all), sel_homberger(sum_of_all)))
+    print "Full Solomon tests:"
+    printf(sel_solomons(sum_of_all))
+    print "Homberger tests:"
+    printf(sel_homberger(sum_of_all))
+    
     
 def main():
     """Main function - clean up a typical /output (sub)directory."""
     
     # helpers 
     
-    def printf(set_):
-        print "(%d)"%len(set_)
-        print textwrap.fill(" ".join(sorted(set_)))
-        
-    def read_as_set(f):
-        return set(map(str.strip, open(f)))
-        
     def create_file(fn, set_):
         if not os.path.exists(fn):
             open(fn, 'w').write("\n".join(sorted(set_)))
@@ -112,6 +161,17 @@ def main():
     create_file('100s/sometimes.txt', sets_sometimes)
     create_file('100s/good.txt', sets_good) # broadest
     create_file('100s/always.txt', sets_always)
-    
-if __name__ == '__main__': main()
+
+# global list of functions
+from types import FunctionType
+funcs = filter(lambda k: type(globals()[k])==FunctionType, globals().keys())
+
+if __name__ == '__main__': 
+    # my well-known "call-function-from-argv" design pattern
+    import sys
+    if len(sys.argv) > 1 and sys.argv[1] in funcs:
+        # call function passing other args as params
+        print globals()[sys.argv[1]](*sys.argv[2:])
+    else:
+        main()
 
