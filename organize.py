@@ -66,6 +66,16 @@ def union(*args):
     printf(sel_solomons(sum_of_all))
     print "Homberger tests:"
     printf(sel_homberger(sum_of_all))
+
+def intersection(*args):
+    """Set intersection of one (two) or more files."""
+    if len(args) < 1:
+        print "Provide at least two filenames to intersect."
+        return
+    sets = map(read_as_set, args)
+    product_of_all = set.intersection(*sets)
+    print "The elements repeating all over again are:"
+    printf(product_of_all)
     
 def missing(*args):
     """List problem sets which are missing from all the arguments."""
