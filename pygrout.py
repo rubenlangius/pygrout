@@ -124,7 +124,8 @@ class VrptwTask(object):
         """Look for saved best solution values in the bestknown/ dir."""
         try:
             self.best_k, self.best_dist = map(eval,  open(
-                os.path.join('bestknown', self.name+'.txt')).read().split())
+                os.path.join(os.path.dirname(__file__), 'bestknown',
+                self.name+'.txt')).read().split())
             print("Best known solution for test %(name)s: %(best_k)d routes,"
                   " %(best_dist).2f total distance." % self.__dict__)
         except IOError as ioe:
@@ -721,7 +722,10 @@ def run_all(args):
 def load_solution(f):
     """Unpickle solution from a stream."""
     solution_data = cPickle.load(f)
-    sol = VrptwSolution(VrptwTask(open(solution_data['filename'])))
+    filename = os.path.join(os.path.dirname(__file__),
+                            solution_data['filename'])
+    print "Loading solution from:", filename
+    sol = VrptwSolution(VrptwTask(open(filename)))
     sol.k, sol.dist = solution_data['val']
     sol.r = solution_data['routes']
     sol.mem = solution_data['mem']
@@ -813,7 +817,7 @@ def poolchain(args):
     input_ = Queue()
     output = Queue()
     queues = [ poison_pills, input_, output ]
-    oplist = [ None, op_greedy_multiple, None ]
+    oplist = [ None, op_fight_shortest, None ]
     
     # create and launch the workers
     num_workers = args.runs or cpu_count()
@@ -940,7 +944,8 @@ def get_argument_parser():
             description="Optimizing VRPTW instances with some heuristics")
             
         parser.add_argument(
-            "test", type=file, nargs='?', default='hombergers/rc210_1.txt',
+            "test", type=file, nargs='?', default=os.path.join(
+                os.path.dirname(__file__), 'hombergers','rc210_1.txt'),
             help="the test instance: txt format as by M. Solomon")
         parser.add_argument(
             "command", choices=commands, nargs="?", default="poolchain",
