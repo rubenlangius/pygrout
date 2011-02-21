@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+import re 
+import sys
+
 def smart_input(prompt, history=None, suggestions=[], info=None):
     from collections import deque
         
@@ -93,40 +96,58 @@ def smart_input(prompt, history=None, suggestions=[], info=None):
         
     return result
     
-def run_job(job_name, pbs_opts, tasks, pygrout_opts):
+def run_job(task, wall, auto = False):
+    from subprocess import Popen, PIPE
+    from os import getcwd
+
+    # some task preparation (if it wasn't a file, but a test name?)
+
     script = """
     cd %s
     pwd
-    for i in %s; do
-    ./pygrout.py %s $i
     date
-    done
-    """ % (getcwd(), tasks, pygrout_opts)
+    ./pygrout.py --wall %d %s
+    date
+    """ % (getcwd(), wall, task)
     
-    command = 'qsub %s -N %s' % (pbs_opts, job_name)
+    # prepare jobname
+    jobname = re.compile('.txt|hombergers/|solomons/').sub('', 'vrptw_' + task)
+
+    command = 'echo qsub -l nodes=1:nehalem -l walltime=%d -N %s' % (wall+120, jobname)
     
-    print "About to pipe: \n%s\n to the command: \n%s\n\nPress Enter" % (
-        script, command)
-        
-    raw_input()
+    if not auto:
+	    print "About to pipe: \n%s\n to the command: \n%s\n\nPress Enter" % (
+		script, command)
+	    raw_input()
     
-    pipe = Popen(command, shell=True, stdin=PIPE).stdin
-    pipe.write(script)
-    pipe.close()
+    output, errors = Popen(command, shell=True, stdin=PIPE, 
+                           stdout=PIPE, stderr=PIPE).communicate(script)
+    print "Process returned", repr((output, errors))
+    return command, script, jobname, output.strip()
 
 def main():
-    from os import getcwd
-    from subprocess import Popen, PIPE
-    
-    job_name = smart_input('Job name', 'output/.pbs/jobname',['poolchain'])
-    pbs_opts = smart_input('PBS options', 'output/.pbs/options', 
-        ['-l nodes=1:nehalem -l walltime=20000'])
-    tasks = smart_input('Tasks [glob pattern]', 'output/.pbs/tasks', 
-        ['solomons/', 'hombergers/', 'hombergers/*_2??.txt'])
-    pygrout_opts = smart_input('pygrout options', 'output/.pbs/pygroupts', 
-        ['--strive --wall 600', '--wall '])
+    import datetime
+    # job_name = smart_input('Job name', 'output/.pbs/jobname',['poolchain']) 
+    # pbs_opts = smart_input('PBS options', 'output/.pbs/options', 
+    #     ['-l nodes=1:nehalem -l walltime=20000'])
+    # tasks = smart_input('Tasks [glob pattern]', 'output/.pbs/tasks', 
+    #     ['solomons/', 'hombergers/', 'hombergers/*_2??.txt'])
+    # pygrout_opts = smart_input('pygrout options', 'output/.pbs/pygroupts', 
+    #     ['--strive --wall 600', '--wall '])
          
-    run_job(job_name, pbs_opts, tasks, pygrout_opts)
+    wall = int(smart_input('Enter wall time', suggestions=[2000]))
+    auto = raw_input('Confirm single jobs (Y/n)?')=='n'
+    jobs = []
+    for task in sys.argv[1:]:
+        jobs.append(run_job(task, wall, auto))
+
+    log = "\n".join("""
+Command: %s
+Script: %s
+Job name: %s
+Job id: %s
+""" % tup for tup in jobs)
+    open('output/%s.log.txt' % datetime.datetime.now().isoformat(), 'w').write(log)
     
 if __name__ == '__main__':
     main()
