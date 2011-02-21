@@ -67,6 +67,27 @@ def union(*args):
     print "Homberger tests:"
     printf(sel_homberger(sum_of_all))
     
+def missing(*args):
+    """List problem sets which are missing from all the arguments."""
+    
+    def gen_hombergers():
+        """Set of all Homberger instance names."""
+        return set([ c+n+s+x 
+            for c in ['c','r','rc'] 
+            for n in ['1', '2']
+            for s in ['_2','_4','_6','_8','10'] 
+            for x in (['_%d' % i for i in xrange(1,10)]+['10']) ])
+    
+    sum_of_all = set.union(*map(read_as_set, args))
+    
+    hombergers = gen_hombergers()
+    print "Missing Homberger tests:"
+    difference = hombergers.difference(sum_of_all)
+    if difference == hombergers:
+        print "(ALL %d)" % len(hombergers)
+    else:
+        printf(difference)
+
     
 def main():
     """Main function - clean up a typical /output (sub)directory."""
@@ -90,7 +111,7 @@ def main():
     else:
         print "Directory 100s already present"
         
-    # move best results to their directory
+    # move best results to their directory (also their .vrp companions)
     
     solved = re.compile('[^-]+-100.0-.*')
     sol_ok = filter(solved.match, glob.glob('*.*'))
