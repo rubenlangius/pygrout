@@ -435,8 +435,7 @@ def find_allpos_on(sol, c, r):
     and return them as tuples (distinc, position)."""
     # check capacity
     if sol.r[r][R_CAP] + sol.dem(c) > sol.task.capa:
-        return []
-    positions = []
+        return
     # check route edges
     for (a, b, arr_a, larr_b), i in izip(sol.r[r][R_EDG], count()):
         arr_c = max(arr_a + sol.t(a, c), sol.a(c)) # earliest possible
@@ -444,9 +443,12 @@ def find_allpos_on(sol, c, r):
         larr_a = min(sol.b(a), larr_c-sol.t(a, c))
         if  arr_c <= larr_c and arr_a <= larr_a:
             distinc = -(sol.d(a, c) + sol.d(c, b) - sol.d(a, b))
-            positions.append((distinc, pos))
-    return positions
-    
+            yield (distinc, pos)
+
+def find_replace_pos_on(sol, c, r):
+    """Return a position (occupied), where the customer could be inserted."""
+    pass 
+
 def find_bestpos(sol, c):
     """Find best positions on any route, return the route pos and distance.
     The exact format is a nested tuple: ((-dist increase, position), route)"""
@@ -826,6 +828,7 @@ def poolchain(args):
     input_.put(essence)
     sol.set_essence(essence)
     print "Got first solution:", sol.infoline(), "after", time.time()-began 
+    sol.loghist()
 
     # the discriminators of the solution circulation
     best_seen_k = essence[0]
@@ -851,6 +854,7 @@ def poolchain(args):
                 if best_seen_k == sol.task.best_k:
                     print "Best known route count reached:", time.time()-began
                     sol.mem['best_k_found'] = time.time()-began
+
                     if args.strive and time_to_die > time.time()+args.wall/5.0:
                         time_to_die = time.time()+args.wall/5.0
                         print "Remaining time reduced to:", args.wall/5.0
@@ -863,6 +867,10 @@ def poolchain(args):
                 best_essncs.insert(pos, essence)
                 if len(best_essncs) > 15:
                     best_essncs.pop()
+                if pos == 0:
+                    # new global best - remembering as a historical event
+                    sol.set_essence(essence)
+                    sol.loghist()            
             else:
                 # throw in one of the elite solutions
                 input_.put(r.choice(best_essncs))
