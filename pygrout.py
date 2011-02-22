@@ -329,6 +329,7 @@ class VrptwSolution(object):
     def infoline(self):
         return "(%d, %.2f) (%5.1f%%, %5.1f%%)" % (self.val()+self.percentage())
         
+# THE MODEL - basic operations on a solution (through UndoStack
 
 def insert_new(sol, c):
     """Inserts customer C on a new route."""
@@ -524,7 +525,14 @@ def remove_customer(sol, r, pos):
     return b
 
 # NEIGBOURHOOD OPERATORS - single step trials
+    
+operations = dict()
+def operation(func):
+    """A decorator for single solution operations."""
+    operations[func.__name__] = func
+    return func
 
+@operation
 def op_greedy_single(sol, randint = r.randint):
     """Neighbourhood operator - remove random customer and insert back."""
     # pick a route
@@ -533,6 +541,7 @@ def op_greedy_single(sol, randint = r.randint):
     c = remove_customer(sol, r, pos)  
     insert_customer(sol, c)
 
+@operation
 def op_greedy_multiple(sol, randint = r.randint):
     """Remove a few customers from a random route and insert them back."""
     r = randint(0, sol.k-1)
@@ -543,6 +552,7 @@ def op_greedy_multiple(sol, randint = r.randint):
     for c in removed:
         insert_customer(sol, c)
 
+@operation
 def op_fight_shortest(sol, random=r.random, randint=r.randint):
     """Picks and tries to empty a random route with preference for shortest."""
     shot = random()
@@ -561,20 +571,26 @@ def op_fight_shortest(sol, random=r.random, randint=r.randint):
     for c in removed:
         insert_customer(sol, c)
     
-def op_route_min():
+#@operation
+def op_route_min(sol, random=r.random, randint=r.randint, data=dict()):
     """Emulate the route minimization (RM) heuristic by Nagata et al."""
-    u.checkpoint()
-    
-# OPERATIONS - single solution building blocks
+    r = randint(0, sol.k-1)
+    num_removed = min(randint(1, 10), sol.r[r][R_LEN]-1)
+        
+# major solution functions (metaheuristics)
 
-operations = set()
-def operation(func):
-    """A decorator for single solution operations (maybe lengthy)."""
-    operations.add(func.__name__)
-    return func
+def build_first(sol):
+    """Greedily construct the first solution."""
+    sol.dist = 0
+    sol.k = 0
+    sol.r = []
+    for c in sol.task.getSortedCustomers():
+        insert_customer(sol, c[ID])
+    sol.mem['init_order'] = VrptwTask.sort_order
+    u.commit()
+    sol.loghist()
 
-@operation
-def local_search(sol, oper=op_greedy_multiple, end=0, verb=False):
+def local_search(sol, oper, end=0, verb=False):
     """Optimize solution by local search."""
     # local rebinds
     ci=u.commit; undo=u.undo; val=sol.val 
@@ -607,13 +623,16 @@ def local_search(sol, oper=op_greedy_multiple, end=0, verb=False):
           elapsed, steps/elapsed, updates, updates/elapsed) ])
     sol.loghist()
     return sol
-
-@operation
-def minroute_search(sol):
-    """Rather temporary operation: fight the shortest route."""
-    return local_search(sol, op_fight_shortest)
     
-@operation
+                
+def simulated_annealing(sol, oper):
+    pass
+
+# MISC. SOLUTION FUNCTIONS - postprocessing
+
+def save_solution(sol, extra=None):
+    sol.save(extra)
+
 def plot_history(sol):
     """Display a matplotlib graph of solution progress"""
     from matplotlib import pyplot as plt
@@ -635,45 +654,6 @@ def plot_history(sol):
         dplt.axhline(sol.task.best_dist)
     
     plt.show()
-                
-@operation
-def simulated_annealing(sol, oper=op_greedy_multiple):
-    pass
-
-@operation
-def solution_diag(sol):
-    if not sol.check():
-        badroute = dropwhile(sol.check_route, xrange(len(sol.r))).next()
-        print "Bad route:", badroute
-        sol.task.routeInfo(sol.r[badroute])
-        u.undo_last()
-        print "----\n"*3, "Was before:"
-        sol.task.routeInfo(sol.r[badroute])
-        exit()
-
-@operation
-def build_first(sol):
-    """Greedily construct the first solution."""
-    sol.dist = 0
-    sol.k = 0
-    sol.r = []
-    for c in sol.task.getSortedCustomers():
-        insert_customer(sol, c[ID])
-    sol.mem['init_order'] = VrptwTask.sort_order
-    u.commit()
-    sol.loghist()
-
-@operation
-def save_solution(sol, extra=None):
-    sol.save(extra)
-
-# OPERATION PRESETS
-
-presets = {
-    'default': "build_first local_search save_solution".split(),
-    'shortest': "build_first minroute_search save_solution".split(),
-    'defplot': "build_first local_search save_solution plot_history".split(),
-}
 
 # MAIN COMMANDS
 
@@ -684,40 +664,45 @@ def command(func):
     return func
 
 
-def _optimize(test, operations = presets['default']):
+def _optimize(test, op, wall, intvl):
     """An optimization funtion, which does not use argparse namespace."""
     sol = VrptwSolution(VrptwTask(test))
-    # don't FIXME: should check if this is marked as operation at all?
-    for op in operations:
-        globals()[op](sol)
+    build_first(sol)
+    print "Starting optimization for %d s, update every %s s." % (wall, intvl)
+    time_to_die = time.time() + wall
+    next_feedback = time.time() + intvl
+    while time.time() < time_to_die:
+        local_search(sol, operations[op], next_feedback, True)
+        next_feedback = time.time()+intvl
+    print "Wall time reached for %s." % test.name
+    save_solution(sol)
     print(sol.mem)
     return sol
     
 @command
 def optimize(args):
     """Perform optimization of a VRPTW instance according to the arguments."""
-    op_list = args.run if args.run else presets[args.preset]
-    sol = _optimize(args.test, op_list)
+    sol = _optimize(args.test, args.op, args.wall, args.intvl)
     return sol
 
 def _optimize_by_name(arg):
-    (fname, operations) = arg
-    return _optimize(open(fname), operations)
+    # open the test filename (VrptwTask had problems with it)
+    arg[0] = open(arg[0])
+    return _optimize(*arg)
     
 @command
 def run_all(args):
     """As optimize, but runs all instances."""
     from glob import glob
     runs = args.runs or 1
-    all_tasks = glob(args.glob) * args.runs
-    op_list = args.run if args.run else presets[args.preset]
-    target = [(t, op_list) for t in  all_tasks]
+    all_tasks = [[n, args.op, args.wall, args.intvl] 
+                 for n in glob(args.glob) * args.runs]
     if args.multi:
         from multiprocessing import Pool
         p = Pool()    
-        p.map(_optimize_by_name, target)
+        p.map(_optimize_by_name, all_tasks)
     else:
-        map(_optimize_by_name, target)
+        map(_optimize_by_name, all_tasks)
 
 def load_solution(f):
     """Unpickle solution from a stream."""
@@ -817,7 +802,7 @@ def poolchain(args):
     input_ = Queue()
     output = Queue()
     queues = [ poison_pills, input_, output ]
-    oplist = [ None, op_fight_shortest, None ]
+    oplist = [ None, operations[args.op], None ]
     
     # create and launch the workers
     num_workers = args.runs or cpu_count()
@@ -940,7 +925,6 @@ def get_argument_parser():
     try:
         from argparse import ArgumentParser, Action
         parser = ArgumentParser(
-            epilog="The default presets are: "+str(presets['default']),
             description="Optimizing VRPTW instances with some heuristics")
             
         parser.add_argument(
@@ -949,13 +933,12 @@ def get_argument_parser():
             help="the test instance: txt format as by M. Solomon")
         parser.add_argument(
             "command", choices=commands, nargs="?", default="poolchain",
-            help="main command to execute")
+            help="main command to execute (when omitted: poolchain)")
+            
         parser.add_argument(
-            "--run", "-e", choices=operations, action="append",
-            help="perform specific available operation on the solution")
-        parser.add_argument(
-            "--preset", choices=presets.keys(), default="default",
-            help="choose a preset of operations (for optimize command)")
+            "--op", choices=operations.keys(), nargs="?",
+            default="op_fight_shortest", help="neighbourhood operator to use")
+        
         parser.add_argument(
             "--runs", "-n", type=int, default=0,
             help="repeat (e.g. optimization) n times, or use n processes")
@@ -968,7 +951,7 @@ def get_argument_parser():
             help="approximate walltime (real) in seconds")
         parser.add_argument(
             "--intvl", type=int, default=3,
-            help="approximate refresh rate (delay between messages")
+            help="approximate refresh rate (delay between messages)")
         parser.add_argument(
             "--strive", action="store_true",
             help="run for best known route count, and then only short")
