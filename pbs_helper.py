@@ -96,7 +96,7 @@ def smart_input(prompt, history=None, suggestions=[], info=None):
         
     return result
     
-def run_job(task, wall, auto = False):
+def run_job(task_portion, wall, auto = False, extra = ''):
     from subprocess import Popen, PIPE
     from os import getcwd
 
@@ -105,15 +105,15 @@ def run_job(task, wall, auto = False):
     script = """
     cd %s
     pwd
-    date
-    ./pygrout.py --wall %d %s
-    date
-    """ % (getcwd(), wall, task)
+    date """ % getcwd() + "".join("""
+    ./pygrout.py %s --wall %d %s
+    date """ % (extra, wall, task) for task in task_portion)
     
     # prepare jobname
-    jobname = re.compile('.txt|hombergers/|solomons/').sub('', 'vrptw_' + task)
+    jobname = re.sub('.txt|hombergers/|solomons/', '', 'vrptw_' + task_portion[0])
 
-    command = 'echo qsub -l nodes=1:nehalem -l walltime=%d -N %s' % (wall+120, jobname)
+    command = 'qsub -l nodes=1:nehalem -l walltime=%d -N %s' % (
+        (wall+60)*len(task_portion), jobname)
     
     if not auto:
 	    print "About to pipe: \n%s\n to the command: \n%s\n\nPress Enter" % (
@@ -134,12 +134,27 @@ def main():
     #     ['solomons/', 'hombergers/', 'hombergers/*_2??.txt'])
     # pygrout_opts = smart_input('pygrout options', 'output/.pbs/pygroupts', 
     #     ['--strive --wall 600', '--wall '])
-         
-    wall = int(smart_input('Enter wall time', suggestions=[2000]))
+    
+    if len(sys.argv) < 2:
+        print "No arguments (tasks) provided"
+        return
+    
+    tasks = sys.argv[1:]
+    wall = int(smart_input('Enter wall time (per task)', suggestions=[2000]))
+    total = len(tasks)*(wall+60)
+    print "There are %d tasks, which makes %s s (%02d:%02d:%02d) total." % (
+        len(tasks), total, total/3600, total%3600/60, total%60)
+    print "A single task is %02d:%02d" % (wall/60+1, wall%60)
+    per_job = int(smart_input('How many task per job', suggestions=[20]))
+    total = per_job*(wall+60)
+    print "A single job will run %02d:%02d:%02d" % (total/3600,
+        total%3600/60, total%60)
+    extra = smart_input('Extra args for pygrout', suggestions=[''])
     auto = raw_input('Confirm single jobs (Y/n)?')=='n'
     jobs = []
-    for task in sys.argv[1:]:
-        jobs.append(run_job(task, wall, auto))
+    
+    for i in xrange(0, len(tasks), per_job):
+        jobs.append(run_job(tasks[i:i+per_job], wall, auto, extra))
 
     log = "\n".join("""
 Command: %s

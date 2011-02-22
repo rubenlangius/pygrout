@@ -526,9 +526,8 @@ def op_greedy_multiple(sol, randint = r.randint):
     for c in removed:
         insert_customer(sol, c)
 
-@operation
-def op_fight_shortest(sol, random=r.random, randint=r.randint):
-    """Picks and tries to empty a random route with preference for shortest."""
+def short_route(sol, random=r.random):
+    """Pick a route with preference for shortest."""
     shot = random()
     n = sol.task.N
     denom = float(n*(sol.k-1))
@@ -537,7 +536,14 @@ def op_fight_shortest(sol, random=r.random, randint=r.randint):
     for rt in sol.r:
         r += 1
         t += (n-rt[R_LEN])/denom
-        if t > shot: break
+        if t > shot: 
+            return r
+    return sol.k-1
+    
+@operation
+def op_fight_shortest(sol, random=r.random, randint=r.randint, gr=short_route):
+    """Picks and tries to empty a random route with preference for shortest."""
+    r = gr(sol)
     num_removed = min(randint(1, 10), sol.r[r][R_LEN]-1)
     removed = []
     for i in xrange(num_removed):
@@ -546,9 +552,12 @@ def op_fight_shortest(sol, random=r.random, randint=r.randint):
         insert_customer(sol, c)
         
 @operation
-def op_tabu_single(sol, randint = r.randint):
+def op_tabu_single(sol, randint = r.randint, gr=short_route):
     """Pick one customer from a random route and move him to a different."""
-    r = randint(0, sol.k-1)
+    if randint(0,2):
+        r = randint(0, sol.k-1)
+    else:
+        r = gr(sol)
     pos = randint(0, sol.r[r][R_LEN]-2)
     c = remove_customer(sol, r, pos)  
     for tries in xrange(sol.k-1):
@@ -582,7 +591,7 @@ def build_first(sol):
     u.commit()
     sol.loghist()
 
-def local_search(sol, oper, end=0, verb=False):
+def local_search(sol, oper, end=0, verb=False, speed=None):
     """Optimize solution by local search."""
     # local rebinds
     ci=u.commit; undo=u.undo; val=sol.val 
@@ -613,6 +622,9 @@ def local_search(sol, oper, end=0, verb=False):
         print " ".join([ sol.infoline(), 
           "%.1f s, %.2f fps, %d acc (%.2f aps)" % (
           elapsed, steps/elapsed, updates, updates/elapsed) ])
+    # fps measurement from outside
+    if not speed is None:
+        speed.append(steps/elapsed)
     sol.loghist()
     return sol
     
@@ -756,14 +768,15 @@ def worker(sol, pools, operators, proc_id, size, intvl):
     # disperse workers' feedback a bit (actually: random)
     next_feedback = time.time() + (proc_id+1)*intvl
     num_produced = 0
+    # the list for measurement of fps etc.
+    myfps = []
     
     while True:
         # check pill
         try:
             pill = pools[0].get_nowait()
-            print "Worker", proc_id, "got poisoned..."
-            # Saving my solution for now."
-            # save_solution(sol, "_pcw%d" % proc_id)
+            print "Worker %d got pill. Avg performance: %f fps" % (proc_id, 
+                sum(myfps)/len(myfps))
             break
         except q.Empty:
             pass
@@ -785,7 +798,7 @@ def worker(sol, pools, operators, proc_id, size, intvl):
             # else: go on with current
         
         # run optimization 
-        local_search(sol, operators[1], next_feedback, )
+        local_search(sol, operators[1], next_feedback, speed=myfps)
         next_feedback = time.time() + intvl*(size+1)
         
         # throw the solution back to the pool
@@ -802,6 +815,7 @@ def poolchain(args):
     from multiprocessing import cpu_count, Process, Queue
     from bisect import bisect_left
     
+    time_to_die = time.time()+args.wall
     # create own solution object (for test data being inherited)
     began = time.time()
     sol = VrptwSolution(VrptwTask(args.test))
@@ -835,11 +849,10 @@ def poolchain(args):
         print "Best known route count immediately:", time.time()-began
         sol.mem['best_k_found'] = time.time()-began
         if args.strive:
-            args.wall /= 5.0
-            print "Wall time reduced to:", args.wall
+            time_to_die = time.time() + args.wall / 5.0
+            print "Wall time reduced to:", time_to_die - time.time()
     
     # manage the pool for a while (now - simply feed them back)
-    time_to_die = time.time()+args.wall
     # ---- START OF MAIN LOOP ----
     while time.time() < time_to_die:
         essence = output.get()
