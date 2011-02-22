@@ -657,20 +657,36 @@ def plot_history(sol):
     k, dist, t = zip(*sol.history)
     fig = plt.figure()
     
+    fig.suptitle(sol.task.name+" "+sol.infoline())
+    
+    # subplot of routes vs. time
     kplt = fig.add_subplot(121)
-    kplt.plot(t, k)
+    kline = kplt.plot(t, k, 'g')
     min_k = (sol.task.best_k or 2)-2
+    # scaling
     kplt.axis([0, sol.history[-1][2], min_k, max(k)+1])
+    # labels etc.
+    plt.xlabel('time [s]')
+    plt.ylabel('routes (k)')
     if sol.task.best_k:
-        kplt.axhline(sol.task.best_k)
-
+        kplt.axhline(sol.task.best_k+0.03)
+    
+    # subplot of distance vs. time
     dplt = fig.add_subplot(122)
-    dplt.plot(t, dist)
-    min_d = (sol.task.best_dist or 20)-20
-    dplt.axis([0, sol.history[-1][2], min_d, max(dist)+10])
+    dline = dplt.plot(t, dist, 'g')
+    # scaling the plot
+    min_d = min(dist+(sol.task.best_dist,))
+    max_d = max(dist+(sol.task.best_dist,))
+    span_d = max_d - min_d
+    dplt.axis([0, sol.history[-1][2], min_d-span_d/20., max_d+span_d/20.])
+    # decoration with labels, etc.
+    plt.grid(True)
+    dplt.set_xlabel('time [s]')
+    dplt.set_ylabel('dist')
+    dplt.yaxis.set_label_position("right")
+    dplt.yaxis.set_ticks_position("right")
     if sol.task.best_dist:
         dplt.axhline(sol.task.best_dist)
-    
     plt.show()
 
 # MAIN COMMANDS
