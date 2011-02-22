@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-from math import hypot
 from random import Random
 from itertools import count, izip, dropwhile
 from collections import deque
@@ -68,36 +67,17 @@ class VrptwTask(object):
         
     def precompute(self):
         """Initialize or update computed members: distances and times."""
-        try:
-            # numpy version - faster! 
-            if NO_NUMPY:
-                raise ImportError
-            from numpy import tile
-            from operator import itemgetter
-            # transpose customers, get Xs and Ys and SRVs
-            x, y, srv = itemgetter(X, Y, SRV)(zip(*self.cust))
-            # make squares
-            xx, yy = tile(x, (len(x),1)), tile(y, (len(y), 1))
-            # compute hypots - distances
-            self.dist = ((xx-xx.T)**2+(yy-yy.T)**2)**0.5
-            # compute travel times (including service)
-            self.time = self.dist + tile(srv, (len(srv),1)).T
-        except ImportError:
-            # no numpy - list fallback
-            # distances between customers
-            sys.stderr.write("Warning: Not using NumPy\n")
-            self.dist = [
-                [ hypot(self.cust[i][X]-self.cust[j][X],
-                        self.cust[i][Y]-self.cust[j][Y])
-                  for j in xrange(len(self.cust))
-                ] for i in xrange(len(self.cust))
-            ]
-            # travel times including service
-            self.time = [
-                [ elem  + self.cust[j][SRV] for elem in self.dist[j] ]
-                 for j in xrange(len(self.dist))
-            ]
-            
+        from numpy import tile
+        from operator import itemgetter
+        # transpose customers, get Xs and Ys and SRVs
+        x, y, srv = itemgetter(X, Y, SRV)(zip(*self.cust))
+        # make squares
+        xx, yy = tile(x, (len(x),1)), tile(y, (len(y), 1))
+        # compute hypots - distances
+        self.dist = ((xx-xx.T)**2+(yy-yy.T)**2)**0.5
+        # compute travel times (including service)
+        self.time = self.dist + tile(srv, (len(srv),1)).T
+
     def routeInfo(self, route):
         """Displays a route summary."""
         cap, dist = 0.0, 0.0
@@ -192,7 +172,8 @@ class VrptwSolution(object):
         d = self.task.dist
         t = self.task.time
         cust = self.task.cust
-        for l in xrange(1, len(lines)-1):
+        for l in xrange(1, len(lines)-2):
+            # the last line should contain a newline, so -2
             customers = map(int, lines[l].split())
             edges = []
             load = 0
@@ -470,26 +451,19 @@ def find_bestpos_except_route(sol, c, r):
 
 def insert_customer(sol, c):
     """Insert customer at best position or new route."""
-    if not len(sol.r):
+    if sol.k == 0:
         insert_new(sol, c)
-        if DEBUG_INIT:
-            print c, ">new", len(sol.r)-1
-        return len(sol.r)-1, 0
+        return sol.k-1, 0
     else:
         # best distinc, best pos, best route
         (bd, bp), br = find_bestpos(sol, c)
         # found some route to insert
         if not bd is None:
             insert_at_pos(sol, c, br, bp)
-            if DEBUG_INIT:
-                print "Cust %d to route %d after %d distinc %.3f" % (
-                    c, br, sol.r[br][R_EDG][bp][E_FRO], -bd )
             return br, bp
         else:
             insert_new(sol, c)
-            if DEBUG_INIT:
-                print c, ">new", len(sol.r)-1
-            return len(sol.r)-1, 0
+            return sol.k-1, 0
 
 def remove_customer(sol, r, pos):
     """Remove customer at pos from a route and return his ID."""

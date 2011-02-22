@@ -1,8 +1,3 @@
-# use not numpy, even when available
-NO_NUMPY = False
-# print extra messages for initial solution generation
-DEBUG_INIT = False
-
 # tuple indices in customer tuple:
 # number, coordinates(X,Y), demand, ready(A), due(B), service time
 ID, X, Y, DEM, A, B, SRV = range(7)
