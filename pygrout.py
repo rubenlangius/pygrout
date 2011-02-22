@@ -570,6 +570,24 @@ def op_fight_shortest(sol, random=r.random, randint=r.randint):
         removed.append(remove_customer(sol, r, randint(0, sol.r[r][R_LEN]-2)))
     for c in removed:
         insert_customer(sol, c)
+        
+@operation
+def op_tabu_single(sol, randint = r.randint):
+    """Pick one customer from a random route and move him to a different."""
+    r = randint(0, sol.k-1)
+    pos = randint(0, sol.r[r][R_LEN]-2)
+    c = remove_customer(sol, r, pos)  
+    for tries in xrange(sol.k-1):
+        # max k tries
+        r2 = randint(0, sol.k-2)
+        # picking all other with equal probability
+        if r2 >= r: r2 +=1
+        dist, pos = find_bestpos_on(sol, c, r2)
+        if pos:
+            insert_at_pos(sol, c, r2, pos)
+    # customer c from r failed to move
+    u.undo()
+        
     
 #@operation
 def op_route_min(sol, random=r.random, randint=r.randint, data=dict()):
