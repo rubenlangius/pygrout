@@ -3,6 +3,7 @@
 from random import Random
 from itertools import count, izip, dropwhile
 from collections import deque
+from operator import itemgetter
 
 import sys
 import os
@@ -43,7 +44,7 @@ sort_keys = dict(
     by_timewin      = lambda x: x[B]-x[A], # ascending TW
     by_timewin_desc = lambda x: x[A]-x[B], # descending TW
     by_id           = lambda x: 0,         # unsorted
-    by_random_ord   = lambda x: r.random # random order
+    by_random_ord   = lambda x: r.random() # random order
 )
 
 class VrptwTask(object):
@@ -68,15 +69,22 @@ class VrptwTask(object):
     def precompute(self):
         """Initialize or update computed members: distances and times."""
         from numpy import tile
-        from operator import itemgetter
         # transpose customers, get Xs and Ys and SRVs
-        x, y, srv = itemgetter(X, Y, SRV)(zip(*self.cust))
+        x, y, srv, demands = itemgetter(X, Y, SRV, DEM)(zip(*self.cust))
         # make squares
         xx, yy = tile(x, (len(x),1)), tile(y, (len(y), 1))
         # compute hypots - distances
         self.dist = ((xx-xx.T)**2+(yy-yy.T)**2)**0.5
         # compute travel times (including service)
         self.time = self.dist + tile(srv, (len(srv),1)).T
+        # calculating demand-related values
+        self.demands = sorted(demands)
+        self.sum_demand = sum(demands)
+        self.kbound_min = -(-self.sum_demand//self.capa)
+        print "Sum of q: %d (k_min >= %d), Q(0..4) = %d %d %d %d %d" % (
+            self.sum_demand, self.kbound_min, self.demands[1],
+            self.demands[self.N//4], self.demands[self.N//2],
+            self.demands[self.N*3//4], self.demands[-1])
 
     def routeInfo(self, route):
         """Displays a route summary."""
@@ -413,41 +421,10 @@ def find_bestpos_on(sol, c, r):
     # find the best edge 
     return max(map(eval_edge, enumerate(sol.r[r][R_EDG])))
 
-def find_allpos_on(sol, c, r):
-    """Find all positions where customer c can be inserted on route r
-    and return them as tuples (distinc, position)."""
-    # check capacity
-    if sol.r[r][R_CAP] + sol.dem(c) > sol.task.capa:
-        return
-    # check route edges
-    for (a, b, arr_a, larr_b), i in izip(sol.r[r][R_EDG], count()):
-        arr_c = max(arr_a + sol.t(a, c), sol.a(c)) # earliest possible
-        larr_c = min(sol.b(c), larr_b-sol.t(c, b)) # latest if c WAS here
-        larr_a = min(sol.b(a), larr_c-sol.t(a, c))
-        if  arr_c <= larr_c and arr_a <= larr_a:
-            distinc = -(sol.d(a, c) + sol.d(c, b) - sol.d(a, b))
-            yield (distinc, pos)
-
-def find_replace_pos_on(sol, c, r):
-    """Return a position (occupied), where the customer could be inserted."""
-    pass 
-
 def find_bestpos(sol, c):
     """Find best positions on any route, return the route pos and distance.
     The exact format is a nested tuple: ((-dist increase, position), route)"""
     return max((find_bestpos_on(sol, c, rn), rn) for rn in xrange(len(sol.r)))
-
-def find_bestpos_except_pos(sol, c, r, pos):
-    """Find best position on routes other than position pos on route r.
-    Most likely to be called with customer previous position."""
-    return max((find_bestpos_on(sol, c, rn, [pos if rn==r else None]), rn) 
-        for rn in xrange(len(sol.r)))
-
-def find_bestpos_except_route(sol, c, r):
-    """Find best position on routes other than position pos on route r.
-    Most likely to be called with customer previous route."""
-    return max((find_bestpos_on(sol, c, rn), rn) 
-        for rn in xrange(len(sol.r)) if rn <> r)
 
 def insert_customer(sol, c):
     """Insert customer at best position or new route."""
@@ -526,11 +503,12 @@ def op_greedy_multiple(sol, randint = r.randint):
     for c in removed:
         insert_customer(sol, c)
 
-def short_route(sol, random=r.random):
+def pick_short_route(sol, random=r.random):
     """Pick a route with preference for shortest."""
     shot = random()
     n = sol.task.N
     denom = float(n*(sol.k-1))
+    n += 1 # because lengths are +1 (edges, not vertices)
     t = 0
     r = -1
     for rt in sol.r:
@@ -538,46 +516,115 @@ def short_route(sol, random=r.random):
         t += (n-rt[R_LEN])/denom
         if t > shot: 
             return r
-    return sol.k-1
-    
+    # this usually means wrong normalization... leaving print stmt
+    print "After short loop: r %d, t %.3f shot %.3f" % (r, t, shot)            
+    return r
+
+def pick_long_route(sol, delta_Q = 0, random=r.random):
+    shot = random()*2
+    # one customer is outside now. ok, and what if more?
+    N = float(sol.task.N-1) 
+    Q = float(sol.task.sum_demand) + delta_Q # his load
+    t = 0
+    r = -1
+    for rt in sol.r:
+        r += 1
+        t += (rt[R_LEN]-1)/N + rt[R_CAP]/Q
+        if t > shot: 
+            return r
+    # this usually means wrong normalization... leaving print stmt
+    print "After long loop: r %d, t %.3f shot %.3f" % (r, t, shot)
+    return r
+
+def find_allpos_on(sol, c, r, startpos=0):
+    """Find all positions where customer c can be inserted on route r
+    and return them as tuples (distinc, position)."""
+    # check capacity
+    if sol.r[r][R_CAP] + sol.dem(c) > sol.task.capa:
+        return
+    # check route edges
+    edges = sol.r[r][R_EDG]
+    time = sol.task.time
+    cust = sol.task.cust
+    dist = sol.task.dist
+    c_a = cust[c][A]
+    c_b = cust[c][B]
+    for pos in xrange(startpos, sol.r[r][R_LEN]):
+        a, b, arr_a, larr_b = edges[pos]
+        if c_a > larr_b:
+            # too early
+            continue
+        if arr_a > c_b:
+            # too late
+            break
+        arr_c  = max(arr_a + time[a][c], c_a) # earliest possible
+        larr_c = min(c_b, larr_b-time[c][b]) # latest if c WAS here
+        larr_a = min(cust[a][B], larr_c-time[a][c])
+        if  arr_c <= larr_c and arr_a <= larr_a:
+            # for some cases distinc in optional...
+            distinc = -(dist[a][c] + dist[c][b] - dist[a][b])
+            yield (distinc, pos)
+                
 @operation
-def op_fight_shortest(sol, random=r.random, randint=r.randint, gr=short_route):
+def op_fight_shortest(sol, random=r.random, randint=r.randint):
     """Picks and tries to empty a random route with preference for shortest."""
-    r = gr(sol)
+    r = pick_short_route(sol)
     num_removed = min(randint(1, 10), sol.r[r][R_LEN]-1)
     removed = []
     for i in xrange(num_removed):
         removed.append(remove_customer(sol, r, randint(0, sol.r[r][R_LEN]-2)))
     for c in removed:
         insert_customer(sol, c)
-        
+
+def d(s):
+    """Debug print with a sleep."""
+    print s
+    time.sleep(1)
+    
 @operation
-def op_tabu_single(sol, randint = r.randint, gr=short_route):
+def op_tabu_single(sol, randint = r.randint):
     """Pick one customer from a random route and move him to a different."""
-    if randint(0,2):
-        r = randint(0, sol.k-1)
-    else:
-        r = gr(sol)
+    r = pick_short_route(sol)
     pos = randint(0, sol.r[r][R_LEN]-2)
-    c = remove_customer(sol, r, pos)  
+    c = remove_customer(sol, r, pos)
+    d("Route %d, from %d, removed customer %d"%(r,pos,c))  
     for tries in xrange(sol.k-1):
         # max k tries
         r2 = randint(0, sol.k-2)
         # picking all other with equal probability
         if r2 >= r: r2 +=1
+        d("other route %d" % r2)
+        try:
+            dist, pos = find_allpos_on(sol, c, r2).next()
+            d("found pos %d (%.2f inc)" % (pos, dist))
+            insert_at_pos(sol, c, r2, pos)
+            return
+        except StopIteration:
+            d("and bestpos, with %s, is %s"%find_bestpos_on(sol, c, r2))
+            continue
+    # customer c from r failed to move - insert him back
+    u.undo()
+
+@operation
+def op_tabu_shortest(sol, randint = r.randint):
+    r = pick_short_route(sol)
+    num_removed = randint(0, sol.r[r][R_LEN]-2)
+    removed = []
+    for i in xrange(num_removed):
+        removed.append(remove_customer(sol, r, randint(0, sol.r[r][R_LEN]-2)))
+    dQ = -sol.dem(c)
+    for tries in xrange(sol.k-1):
+        # max k tries
+        r2 = pick_long_route(sol, dQ)
+        # print "Long route", r2
+        # time.sleep(0.6)
         dist, pos = find_bestpos_on(sol, c, r2)
         if pos:
             insert_at_pos(sol, c, r2, pos)
+            return
     # customer c from r failed to move
-    u.undo()
-        
-    
-#@operation
-def op_route_min(sol, random=r.random, randint=r.randint, data=dict()):
-    """Emulate the route minimization (RM) heuristic by Nagata et al."""
-    r = randint(0, sol.k-1)
-    num_removed = min(randint(1, 10), sol.r[r][R_LEN]-1)
-        
+    # print "No success with %d from %d" % (c, r) 
+    u.undo()    
 # major solution functions (metaheuristics)
 
 def build_first(sol):
@@ -675,28 +722,112 @@ def plot_history(sol):
         dplt.axhline(sol.task.best_dist)
     plt.show()
 
-# MAIN COMMANDS
+# aggressive route minimization
 
+def find_replace_pos_on(sol, c, r):
+    """Return a position (occupied), where the customer could be inserted."""
+    # pull out deep things locally
+    time = sol.task.time
+    cust = sol.task.cust
+    dist = sol.task.dist
+    c_a = cust[c][A]
+    c_b = cust[c][B]
+    pos = 0
+    for a, b, arr_a, larr_b in sol.r[r][R_EDG]:
+        if c_a > larr_b:
+            pos += 1
+            continue
+        if arr_a > c_b:
+            break
+    return None
+    
+def short_light_route(sol):
+    """Return the index of the shortest of the three lightest routes."""
+    from heapq import nsmallest
+    if sol.k > 3:
+        candidates = nsmallest(3, xrange(sol.k), key=lambda x: sol.r[x][R_CAP])
+    else:
+        candidates = xrange(sol.k)
+    return min( (sol.r[i][R_LEN], i) for i in candidates )[1]
+    
+def remove_route(sol, r):
+    data = u.pop(sol.r, r)
+    cust = map(itemgetter(0), data[R_EDG])[1:]
+    u.ada(sol, 'k', -1)
+    u.ada(sol, 'dist', -data[R_DIS])    
+    return cust
+
+#@operation
+def op_route_min(sol, random=r.random, randint=r.randint, data=dict(die=0)):
+    """Emulate the route minimization (RM) heuristic by Nagata et al."""
+    from collections import deque
+    
+    r = short_light_route(sol)
+    print "I'll try to eliminate route", r+1
+    ep = deque(remove_route(sol, r))
+    print "%d customers left to go: %s" % (len(ep), " ".join(map(str, ep)))
+    def insert(c, r, pos, ep):
+        print "Customer %d goes to %d at pos %d" % (c, r, pos)
+        insert_at_pos(sol, c, r, pos)
+        print_like_Czarnas(sol)
+        print "Still left", ep
+        
+    while len(ep) > 0 and not data['die']:
+        c = ep.pop()
+        r = randint(0, sol.k-1)
+        _, pos = find_bestpos_on(sol, c, r)
+        if not pos is None:
+            insert(c, r, pos, ep)
+            continue
+        
+        (_, pos), r = find_bestpos(sol, c)
+        if not pos is None:
+            insert(c, r, pos, ep)
+            continue
+        
+        pos = find_replace_pos_on(sol, c, r)
+        if not pos is None:
+            insert(c, r, pos, ep)
+            continue
+        
+        ep.appendleft(c)
+    raise RuntimeError, 'this is darnd!'
+ 
+# MAIN COMMANDS
 commands = set()
 def command(func):
     """A command decorator - the decoratee should be a valid command."""
     commands.add(func.__name__)
     return func
 
+@command
+def resume(args):
+    data = dict(die=0)
+    def die():
+        data['die'] = 1
+    from threading import Timer
+    Timer(args.wall, die).start()
+    sol = load_solution(args.test)
+    print_like_Czarnas(sol)
+    op_route_min(sol, data=data)
+    print_like_Czarnas(sol)    
 
 def _optimize(test, op, wall, intvl):
     """An optimization funtion, which does not use argparse namespace."""
     sol = VrptwSolution(VrptwTask(test))
     build_first(sol)
+    print_like_Czarnas(sol)
     print "Starting optimization for %d s, update every %s s." % (wall, intvl)
     time_to_die = time.time() + wall
     next_feedback = time.time() + intvl
     while time.time() < time_to_die:
         local_search(sol, operations[op], next_feedback, True)
+        print_like_Czarnas(sol)
         next_feedback = time.time()+intvl
     print "Wall time reached for %s." % test.name
     save_solution(sol)
     print(sol.mem)
+    print_like_Czarnas(sol)
     return sol
     
 @command
@@ -939,6 +1070,23 @@ def poolchain(args):
     
     #map(Process.join, workers)
     print "Total time elapsed:", time.time()-began
+
+@command
+def initials(args):
+    sol = VrptwSolution(VrptwTask(args.test))
+    results = []
+    for k in sort_keys.keys():
+        VrptwTask.sort_order = k
+        build_first(sol)
+        results.append((sol.percentage(), k))
+    VrptwTask.sort_order = 'by_random_ord'
+    for i in xrange(9):
+        build_first(sol)
+        results.append((sol.percentage(), 'by_random_ord'))
+    rank = 1
+    for prec, k in sorted(results):
+        print "%-20s %.2f %.2f    routes %d   rank %02d" % ((k+':',)+prec+(sol.k, rank))
+        rank += 1
 
 def get_argument_parser():
     """Create and configure an argument parser.
