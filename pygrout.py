@@ -888,11 +888,11 @@ def load(args):
 
 # POOLCHAIN metaheuristic and friends
 
-def worker(sol, pools, operators, proc_id, size, intvl):
+def worker(sol, pools, operators, config):
     """The actual working process in a poolchain."""
     import Queue as q
     from multiprocessing import Queue
-    
+    proc_id, size, intvl, deadline = config
     print "Worker launched, id:", proc_id
     # disperse workers' random nubmer generators
     r.jumpahead(20000*proc_id)
@@ -902,16 +902,7 @@ def worker(sol, pools, operators, proc_id, size, intvl):
     # the list for measurement of fps etc.
     myfps = []
     
-    while True:
-        # check pill
-        try:
-            pill = pools[0].get_nowait()
-            print "Worker %d got pill. Avg performance: %f fps" % (proc_id, 
-                sum(myfps)/len(myfps))
-            break
-        except q.Empty:
-            pass
-        
+    while time.time() < deadline:
         # choose solution to work on this round
         try:
             # fish in the the pool
@@ -935,8 +926,8 @@ def worker(sol, pools, operators, proc_id, size, intvl):
         # throw the solution back to the pool
         pools[2].put(sol.get_essence())
     # endwhile:
-    # declare not to do any more output
-    pools[2].put((proc_id, 0, 0))
+    # declare not to do any more output, send 'fps'
+    pools[2].put((proc_id, sum(myfps)/len(myfps), 0))
     # print "Worker", proc_id, "should now finish."
     
 @command
@@ -960,7 +951,8 @@ def poolchain(args):
     # create and launch the workers
     num_workers = args.runs or cpu_count()
     workers = [ Process(
-        target=worker, args=(sol, queues, oplist, i, num_workers, args.intvl))
+        target=worker, args=(sol, queues, oplist, 
+          (i, num_workers, args.intvl, time_to_die)))
         for i in xrange(num_workers) ]
     map(Process.start, workers)
     
@@ -1020,16 +1012,15 @@ def poolchain(args):
             input_.put(r.choice(best_essncs))
     # ---- END OF MAIN LOOP ----
     print "Wall time passed, after:", time.time()-began
-    for i in xrange(num_workers):
-        poison_pills.put(0)
-    
-    print "Pills sent, now will collect solutions"            
-    
-    while num_workers > 0:
+
+    fpss = []
+    workers_left = num_workers
+    while workers_left > 0:
         k, dist, routes = output.get()
         if routes == 0:
-            num_workers -= 1
+            workers_left -= 1
             print "Worker's",k,"pill-box received", time.time()-began
+            fpss.append(dist)
         else:
             if (k, dist) < sol.val():
                 sol.set_essence((k, dist, routes))
@@ -1050,13 +1041,6 @@ def poolchain(args):
         pass
     
     try:
-        poison_pills.get(timeout=0.1)
-    except q.Empty:
-        pass
-    else:
-        print "Possible rubbish in poison_pills"
-
-    try:
         output.get(timeout=0.1)
     except q.Empty:
         pass
@@ -1066,10 +1050,12 @@ def poolchain(args):
     print "Best solution chosen. Saving.", time.time()-began
     save_solution(sol, '_pc') # suffix for poolchain
     print_like_Czarnas(sol)
-    print sol.infoline()
+    print "summary:", sol.task.name, "%d %.2f"%sol.val(), "%.2f %.2f"%sol.percentage(), \
+        "wall", args.wall, "workers", num_workers, "op", args.op
     
     #map(Process.join, workers)
     print "Total time elapsed:", time.time()-began
+    print "Average fps:", sum(fpss), "workers:", num_workers
 
 @command
 def initials(args):
