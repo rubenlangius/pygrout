@@ -21,7 +21,7 @@ def _rec_assert_simmilar(a, b):
 def test_flattening():
     """Checks the format for interchange with other programs, like grout."""
     from pygrout import (VrptwSolution, VrptwTask, build_first,
-      print_like_Czarnas)
+        print_like_Czarnas)
     task = VrptwTask('solomons/rc208.txt')
     s1 = VrptwSolution(task)
     build_first(s1)
@@ -40,6 +40,25 @@ def test_flattening():
 # possible similar tests: test for assign, copy, 
 # {get,set}_essence of Solution. But these work already.    
 
+def test_find_pos():
+    """Check consistency of finding the best position in a route."""
+    from pygrout import (VrptwSolution, VrptwTask, build_first,
+        print_like_Czarnas, find_bestpos_on, find_allpos_on, R_EDG)
+    sol = VrptwSolution(VrptwTask('solomons/rc206.txt'))
+    build_first(sol)
+    for i in xrange(sol.k):
+        for c in sol.r[i][R_EDG][1:]:
+            for j in xrange(sol.k):
+                if i <> j:
+                    best = find_bestpos_on(sol, c[0], j)
+                    allp = list(find_allpos_on(sol, c[0], j))
+                    print "Best:", best, "all:", allp
+                    if best == (None, None):
+                        assert allp == []
+                    else:
+                        assert best in allp
+                        assert best == max(allp)
+
 # Test left out, reenable in case of trouble ;)
 def _test_initial_creation():
     """Unit test for creating solutions to all included benchmarks."""
@@ -50,15 +69,12 @@ def _test_initial_creation():
         assert s.check()==True, 'Benchmark %s failed at initial solution' % test
     from glob import iglob
 
-    completed = 0
     # Homberger's are too heavy
     # from itertools import chain
     # tests = chain(iglob("solomons/*.txt"), iglob('hombergers/*.txt'))
     tests = iglob("solomons/*.txt")
     for test in tests:
         yield check_one, test
-        completed += 1
-    assert completed == 56, 'Wrong number of checked benchmarks'
 
 if __name__ == '__main__':
-    test_flattening()
+    test_find_pos()
