@@ -1078,14 +1078,14 @@ def initials(args):
     for k in sort_keys.keys():
         VrptwTask.sort_order = k
         build_first(sol)
-        results.append((sol.percentage(), k))
+        results.append((sol.percentage(), k, sol.k))
     VrptwTask.sort_order = 'by_random_ord'
     for i in xrange(9):
         build_first(sol)
-        results.append((sol.percentage(), 'by_random_ord'))
+        results.append((sol.percentage(), 'by_random_ord', sol.k))
     rank = 1
-    for prec, k in sorted(results):
-        print "%-20s %.2f %.2f    routes %d   rank %02d" % ((k+':',)+prec+(sol.k, rank))
+    for prec, k, sol_k in sorted(results):
+        print "%-20s %.2f %.2f    routes %d   rank %02d" % ((k+':',)+prec+(sol_k, rank))
         rank += 1
 
 def get_argument_parser():
