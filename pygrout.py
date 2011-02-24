@@ -1050,12 +1050,16 @@ def poolchain(args):
     print "Best solution chosen. Saving.", time.time()-began
     save_solution(sol, '_pc') # suffix for poolchain
     print_like_Czarnas(sol)
-    print "summary:", sol.task.name, "%d %.2f"%sol.val(), "%.2f %.2f"%sol.percentage(), \
-        "wall", args.wall, "workers", num_workers, "op", args.op
-    
+    print "summary:", sol.task.name, "%d %.1f"%sol.val(), "%.1f %.1f"%sol.percentage(), 
+    print "wall", args.wall, "workers", num_workers, "op", args.op, 'best_k',
+    try:
+        print "%.1f" % sol.mem['best_k_found'],
+    except KeyError:
+        print 'NO',
+    print 'fps', "%.1f" % sum(fpss)
+                
     #map(Process.join, workers)
-    print "Total time elapsed:", time.time()-began
-    print "Average fps:", sum(fpss), "workers:", num_workers
+    print "\nTotal time elapsed:", time.time()-began
 
 @command
 def initials(args):
