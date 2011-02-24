@@ -13,7 +13,17 @@ def test_pairs():
     """Unit test for pairs() generator."""
     for actual, expected in zip(pairs(range(5)), [(i, i+1) for i in range(4)]):
         assert actual == expected
-        
+
+def d(s):
+    """Debug print with a sleep."""
+    import time
+    print s
+    time.sleep(1)
+
+def dd(s):
+    """Debug print, no sleep."""
+    print s
+    
 def solution_header(sol):
     """   
     The Czarnas' code features a 'routeCostMultipiler', which is used like this: 
