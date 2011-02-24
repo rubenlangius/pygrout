@@ -588,26 +588,28 @@ def d(s):
     time.sleep(1)
     
 @operation
-def op_tabu_single(sol, randint = r.randint):
+def op_tabu_single(sol, randint = r.randint, choice=r.choice):
     """Pick one customer from a random route and move him to a different."""
     r = pick_short_route(sol)
-    pos = randint(0, sol.r[r][R_LEN]-2)
+    old_len = sol.r[r][R_LEN]
+    pos = randint(0, old_len-2)
     c = remove_customer(sol, r, pos)
-    d("Route %d, from %d, removed customer %d"%(r,pos,c))  
+    # d("Route %d, from %d, removed customer %d"%(r,pos,c))  
     for tries in xrange(sol.k-1):
         # max k tries
         r2 = randint(0, sol.k-2)
         # picking all other with equal probability
         if r2 >= r: r2 +=1
-        d("other route %d" % r2)
-        try:
-            dist, pos = find_allpos_on(sol, c, r2).next()
-            d("found pos %d (%.2f inc)" % (pos, dist))
-            insert_at_pos(sol, c, r2, pos)
-            return
-        except StopIteration:
-            d("and bestpos, with %s, is %s"%find_bestpos_on(sol, c, r2))
+        # d("other route %d" % r2)
+        if sol.r[r2][R_LEN] < old_len:
             continue
+        candidates = sorted(find_allpos_on(sol, c, r2))
+        if not candidates:
+            continue
+        dist, pos = candidates[-1] # choice(candidates)
+        # d("found pos %d (%.2f inc)" % (pos, dist))
+        insert_at_pos(sol, c, r2, pos)
+        return
     # customer c from r failed to move - insert him back
     u.undo()
 
