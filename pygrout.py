@@ -398,7 +398,6 @@ def insert_at_pos(sol, c, r, pos):
 
 def find_bestpos_on(sol, c, r):
     """Finds best position to insert customer on existing route."""
-    pos, mininc = None, None
     # check capacity
     if sol.r[r][R_CAP] + sol.dem(c) > sol.task.capa:
         return None, None
@@ -424,7 +423,14 @@ def find_bestpos_on(sol, c, r):
 def find_bestpos(sol, c):
     """Find best positions on any route, return the route pos and distance.
     The exact format is a nested tuple: ((-dist increase, position), route)"""
-    return max((find_bestpos_on(sol, c, rn), rn) for rn in xrange(len(sol.r)))
+    bdp = (None, None)
+    br = None
+    for i in xrange(sol.k):
+        for m in find_allpos_on(sol, c, i):
+            if m > bdp:
+                bdp = m
+                br = i
+    return (bdp, br)
 
 def insert_customer(sol, c):
     """Insert customer at best position or new route."""
