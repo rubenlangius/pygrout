@@ -4,11 +4,14 @@ from random import Random
 from itertools import count, izip, dropwhile
 from collections import deque
 from operator import itemgetter
+from bisect import bisect_left
 
 import sys
 import os
 import time
 import cPickle
+
+import numpy as np
 
 # for imports in some environments (now 'if' guarded)
 if '.' not in sys.path:
@@ -68,15 +71,15 @@ class VrptwTask(object):
         
     def precompute(self):
         """Initialize or update computed members: distances and times."""
-        from numpy import tile
         # transpose customers, get Xs and Ys and SRVs
         x, y, srv, demands = itemgetter(X, Y, SRV, DEM)(zip(*self.cust))
         # make squares
-        xx, yy = tile(x, (len(x),1)), tile(y, (len(y), 1))
+        xx = np.tile(x, (len(x), 1))
+        yy = np.tile(y, (len(y), 1))
         # compute hypots - distances
         self.dist = ((xx-xx.T)**2+(yy-yy.T)**2)**0.5
         # compute travel times (including service)
-        self.time = self.dist + tile(srv, (len(srv),1)).T
+        self.time = self.dist + np.tile(srv, (len(srv),1)).T
         # calculating demand-related values
         self.demands = sorted(demands)
         self.sum_demand = sum(demands)
@@ -511,36 +514,13 @@ def op_greedy_multiple(sol, randint = r.randint):
 
 def pick_short_route(sol, random=r.random):
     """Pick a route with preference for shortest."""
-    shot = random()
-    n = sol.task.N
-    denom = float(n*(sol.k-1))
-    n += 1 # because lengths are +1 (edges, not vertices)
-    t = 0
-    r = -1
-    for rt in sol.r:
-        r += 1
-        t += (n-rt[R_LEN])/denom
-        if t > shot: 
-            return r
-    # this usually means wrong normalization... leaving print stmt
-    print "After short loop: r %d, t %.3f shot %.3f" % (r, t, shot)            
-    return r
+    r_lengths = np.array([1.0/(rt[R_LEN]-1) for rt in sol.r]).cumsum()
+    return bisect_left(r_lengths, random()*r_lengths[-1])
 
-def pick_long_route(sol, delta_Q = 0, random=r.random):
-    shot = random()*2
-    # one customer is outside now. ok, and what if more?
-    N = float(sol.task.N-1) 
-    Q = float(sol.task.sum_demand) + delta_Q # his load
-    t = 0
-    r = -1
-    for rt in sol.r:
-        r += 1
-        t += (rt[R_LEN]-1)/N + rt[R_CAP]/Q
-        if t > shot: 
-            return r
-    # this usually means wrong normalization... leaving print stmt
-    print "After long loop: r %d, t %.3f shot %.3f" % (r, t, shot)
-    return r
+def pick_long_route(sol, random=r.random):
+    """Return a random route, with preference for the longer."""
+    lengths = np.array([rt[R_LEN]-1 for rt in sol.r]).cumsum()
+    return bisect_left(lengths, random()*lengths[-1])
 
 def find_allpos_on(sol, c, r, startpos=0):
     """Find all positions where customer c can be inserted on route r
@@ -582,16 +562,13 @@ def op_fight_shortest(sol, random=r.random, randint=r.randint):
     for c in removed:
         insert_customer(sol, c)
 
-def d(s):
-    """Debug print with a sleep."""
-    print s
-    time.sleep(1)
     
 @operation
 def op_tabu_single(sol, randint = r.randint, choice=r.choice):
     """Pick one customer from a random route and move him to a different."""
     r = pick_short_route(sol)
     old_len = sol.r[r][R_LEN]
+    old_k = sol.k
     pos = randint(0, old_len-2)
     c = remove_customer(sol, r, pos)
     # d("Route %d, from %d, removed customer %d"%(r,pos,c))  
@@ -599,7 +576,7 @@ def op_tabu_single(sol, randint = r.randint, choice=r.choice):
         # max k tries
         r2 = randint(0, sol.k-2)
         # picking all other with equal probability
-        if r2 >= r: r2 +=1
+        if r2 >= r and sol.k == old_k: r2 +=1
         # d("other route %d" % r2)
         if sol.r[r2][R_LEN] < old_len:
             continue
@@ -616,23 +593,30 @@ def op_tabu_single(sol, randint = r.randint, choice=r.choice):
 @operation
 def op_tabu_shortest(sol, randint = r.randint):
     r = pick_short_route(sol)
-    num_removed = randint(0, sol.r[r][R_LEN]-2)
+    num_removed = randint(1, sol.r[r][R_LEN]-2)
     removed = []
     for i in xrange(num_removed):
         removed.append(remove_customer(sol, r, randint(0, sol.r[r][R_LEN]-2)))
-    dQ = -sol.dem(c)
-    for tries in xrange(sol.k-1):
-        # max k tries
-        r2 = pick_long_route(sol, dQ)
-        # print "Long route", r2
-        # time.sleep(0.6)
-        dist, pos = find_bestpos_on(sol, c, r2)
-        if pos:
-            insert_at_pos(sol, c, r2, pos)
+    for c in removed:
+        tried = set()
+        found = False
+        for tries in xrange(sol.k*2):
+            # max k tries
+            r2 = pick_long_route(sol)
+            if r2 in tried:
+                continue
+            # print "Long route", r2
+            # time.sleep(0.6)
+            dist, pos = find_bestpos_on(sol, c, r2)
+            if pos:
+                insert_at_pos(sol, c, r2, pos)
+                found = True
+            tried.add(r2)
+        if not found:
+            u.undo()
             return
-    # customer c from r failed to move
-    # print "No success with %d from %d" % (c, r) 
-    u.undo()    
+    # print "We displaced %d customers:" % num_removed, customers
+    
 # major solution functions (metaheuristics)
 
 def build_first(sol):
@@ -943,7 +927,6 @@ def poolchain(args):
     """Parallel optimization using a pool of workers and a chain of queues."""
     import Queue as q
     from multiprocessing import cpu_count, Process, Queue
-    from bisect import bisect_left
     
     time_to_die = time.time()+args.wall
     # create own solution object (for test data being inherited)
