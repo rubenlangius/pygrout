@@ -96,7 +96,7 @@ def smart_input(prompt, history=None, suggestions=[], info=None):
         
     return result
     
-def run_job(task_portion, wall, auto = False, extra = ''):
+def run_job(task_portion, wall, auto = False, extra = '', prefix='vrptw'):
     from subprocess import Popen, PIPE
     from os import getcwd
 
@@ -110,9 +110,9 @@ def run_job(task_portion, wall, auto = False, extra = ''):
     date """ % (extra, wall, task) for task in task_portion)
     
     # prepare jobname
-    jobname = re.sub('.txt|hombergers/|solomons/', '', 'vrptw_' + task_portion[0])
+    jobname = re.sub('.txt|hombergers/|solomons/', '', prefix+'_' + task_portion[0])
 
-    command = 'qsub -l nodes=1:nehalem -l walltime=%d -N %s' % (
+    command = 'qsub -l nodes=1:nehalem -l walltime=%d -N %s -e /tmp' % (
         (wall+60)*len(task_portion), jobname)
     
     if not auto:
@@ -127,7 +127,6 @@ def run_job(task_portion, wall, auto = False, extra = ''):
 
 def main():
     import datetime
-    # job_name = smart_input('Job name', 'output/.pbs/jobname',['poolchain']) 
     # pbs_opts = smart_input('PBS options', 'output/.pbs/options', 
     #     ['-l nodes=1:nehalem -l walltime=20000'])
     # tasks = smart_input('Tasks [glob pattern]', 'output/.pbs/tasks', 
@@ -150,11 +149,12 @@ def main():
     print "A single job will run %02d:%02d:%02d" % (total/3600,
         total%3600/60, total%60)
     extra = smart_input('Extra args for pygrout', suggestions=[''])
+    job_name = smart_input('Job name prefix', suggestions=['vrptw']) 
     auto = raw_input('Confirm single jobs (Y/n)?')=='n'
     jobs = []
     
     for i in xrange(0, len(tasks), per_job):
-        jobs.append(run_job(tasks[i:i+per_job], wall, auto, extra))
+        jobs.append(run_job(tasks[i:i+per_job], wall, auto, extra, job_name))
 
     log = "\n".join("""
 Command: %s
