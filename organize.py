@@ -31,9 +31,9 @@ def compare(*args):
     if len(args) > 2:
         print "Warning: only 2 files work now."
     first, secnd = map(read_as_set, args[:2])
-    print "Only in%s:" % args[1]
+    print "Only in%s:" % args[0]
     printf(first.difference(secnd))
-    print "Only in %s:" % args[2]
+    print "Only in %s:" % args[1]
     printf(secnd.difference(first))
     print "In both:"
     printf(first.intersection(secnd))    
