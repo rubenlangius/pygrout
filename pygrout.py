@@ -1066,7 +1066,8 @@ def initials(args):
         results.append((sol.percentage(), 'by_random_ord', sol.k))
     rank = 1
     for prec, k, sol_k in sorted(results):
-        print "%-20s %.2f %.2f    routes %d   rank %02d" % ((k+':',)+prec+(sol_k, rank))
+        print "%-20s %.2f %.2f  routes %d  rank %02d %s" % (
+              (k+':',)+prec+(sol_k, rank, sol.task.name))
         rank += 1
 
 def get_argument_parser():
