@@ -173,7 +173,7 @@ def main():
     
     # ensure there is an up-to-date all_list.txt, read results
     
-    present = set(glob.glob('*.p'))
+    present = set(glob.glob('*.vrp'))
     if os.path.exists('all_list.txt'):
         files = read_as_set('all_list.txt')
         if not files >= present:
@@ -193,7 +193,7 @@ def main():
     # good sets are always in the 
     
     sets_good = set(cutoff.sub('', f.replace('100s/','')).lower()
-                    for f in glob.glob("100s/*.p"))
+                    for f in glob.glob("100s/*.vrp"))
     ##sets_sometimes = sets_bad.intersection(sets_good)
     sets_always = sets_good.difference(sets_bad)
     sets_never = sets_bad.difference(sets_good)
