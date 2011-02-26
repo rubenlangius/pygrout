@@ -1054,6 +1054,7 @@ def poolchain(args):
 
 @command
 def initials(args):
+    """Produce initial solutions in all available ways, and 10x randomly."""
     sol = VrptwSolution(VrptwTask(args.test))
     results = []
     for k in sort_keys.keys():
