@@ -589,7 +589,7 @@ def op_tabu_single(sol, randint = r.randint, choice=r.choice):
 @operation
 def op_tabu_shortest(sol, randint = r.randint):
     r = pick_short_route(sol)
-    num_removed = randint(1, sol.r[r][R_LEN]-2)
+    num_removed = randint(1, sol.r[r][R_LEN]-1)
     removed = []
     for i in xrange(num_removed):
         removed.append(remove_customer(sol, r, randint(0, sol.r[r][R_LEN]-2)))
@@ -607,11 +607,12 @@ def op_tabu_shortest(sol, randint = r.randint):
             if pos:
                 insert_at_pos(sol, c, r2, pos)
                 found = True
+                break
             tried.add(r2)
         if not found:
             u.undo()
             return
-    # print "We displaced %d customers:" % num_removed, customers
+    ##print "We displaced %d customers from %d:" % (num_removed, r), removed
     
 # major solution functions (metaheuristics)
 
