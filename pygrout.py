@@ -670,9 +670,6 @@ def simulated_annealing(sol, oper):
 
 # MISC. SOLUTION FUNCTIONS - postprocessing
 
-def save_solution(sol, extra=None):
-    sol.save(extra)
-
 def plot_history(sol):
     """Display a matplotlib graph of solution progress"""
     from matplotlib import pyplot as plt
@@ -719,18 +716,40 @@ def find_replace_pos_on(sol, c, r):
     time = sol.task.time
     cust = sol.task.cust
     dist = sol.task.dist
-    c_a = cust[c][A]
-    c_b = cust[c][B]
-    pos = 0
-    for a, b, arr_a, larr_b in sol.r[r][R_EDG]:
-        if c_a > larr_b:
-            pos += 1
+    c_A = cust[c][A]
+    c_B = cust[c][B]
+    edges = sol.r[r][R_EDG]
+    q_out = sol.r[r][R_CAP] + cust[c][DEM]  - sol.task.capa
+    # customers - d - deleted, a - starting, b - final, c - inserted
+    a, d, arr_a, _ = edges[0]
+    for pos in xrange(1, len(edges)):
+        d, b, arr_d, larr_b = edges[pos]
+        
+        # check for too early positions, and weight constraint
+        if c_A > larr_b or cust[d][DEM] < q_out:
+            a, d, arr_a, larr_d = d, b, arr_d, larr_b
             continue
-        if arr_a > c_b:
+        
+        # check for too late - end of scan
+        if arr_a > c_B:
             break
         
-    return None
-    
+        arr_c = max(c_A, arr_a+time[a][c])
+        arr_b = max(cust[b][A], arr_c+time[c][b])
+        larr_c = min(c_B, larr_b-time[c][b])
+        larr_a = min(cust[a][B], larr_c-time[c][b])
+        
+        if arr_a <= larr_a and arr_c <= larr_c and arr_b <= larr_b:
+            distinc = dist[a][c]+dist[c][b]-(dist[a][d]+dist[d][b])
+            yield (distinc, pos-1)
+        # for next loop pass:
+        a, d, arr_a, larr_d = d, b, arr_d, larr_b
+
+def find_replace_pos(sol, c):
+    for r in xrange(len(sol.r)):
+        for distinc, pos in find_replace_pos_on(sol, c, r):
+            yield (distinc, r, pos)
+            
 def short_light_route(sol):
     """Return the index of the shortest of the three lightest routes."""
     from heapq import nsmallest
@@ -751,17 +770,32 @@ def remove_route(sol, r):
 #@operation
 def op_route_min(sol, random=r.random, randint=r.randint, data=dict(die=0)):
     """Emulate the route minimization (RM) heuristic by Nagata et al."""
-    from collections import deque
+    from collections import deque, defaultdict
     
     r = short_light_route(sol)
     print "I'll try to eliminate route", r+1
     ep = deque(remove_route(sol, r))
-    print "%d customers left to go: %s" % (len(ep), " ".join(map(str, ep)))
+    print "%d customers left to go:"% len(ep), ep
+    
     def insert(c, r, pos, ep):
-        print "Customer %d goes to %d at pos %d" % (c, r, pos)
+        print "Customer %d goes to %d at pos %d" % (c, r+1, pos)
         insert_at_pos(sol, c, r, pos)
-        print_like_Czarnas(sol)
-        print "Still left", ep
+        #print_like_Czarnas(sol)
+        print "Still left are:", ep
+        
+    recycled = defaultdict(int)
+    def put_to_ep(c, front=True):
+        if front:
+            ep.appendleft(c)
+        else:
+            ep.append(c)
+            
+        recycled[c] += 1
+        print "Next (%d) round for %d" % (c, recycled[c])
+        
+        if any(recycled[x] > 5 for x in ep):
+            print "Too much recycling in the EP: dead end"
+            raise RuntimeError
         
     while len(ep) > 0 and not data['die']:
         c = ep.pop()
@@ -776,13 +810,20 @@ def op_route_min(sol, random=r.random, randint=r.randint, data=dict(die=0)):
             insert(c, r, pos, ep)
             continue
         
-        pos = find_replace_pos_on(sol, c, r)
-        if not pos is None:
-            insert(c, r, pos, ep)
+        pos = sorted(find_replace_pos(sol, c))
+        if pos:
+            print "Positions there:", pos
+            #raw_input()
+            _, r, p = pos[0]
+            put_to_ep(remove_customer(sol, r, p), False)
+            insert(c, r, p, ep)
             continue
-        
-        ep.appendleft(c)
-    raise RuntimeError, 'this is darnd!'
+        put_to_ep(c)
+            
+    if len(ep) > 0:
+        print "Time out!"
+        raise RuntimeError
+    u.commit()
  
 # MAIN COMMANDS
 commands = set()
@@ -793,15 +834,29 @@ def command(func):
 
 @command
 def resume(args):
+    """Load serialized solution, try to aliminate one or two routes."""
+    # autodestruction timeout mechanism:
     data = dict(die=0)
     def die():
         data['die'] = 1
     from threading import Timer
-    Timer(args.wall, die).start()
+    t = Timer(args.wall, die)
+    t.start()
     sol = load_solution(args.test)
     print_like_Czarnas(sol)
-    op_route_min(sol, data=data)
-    print_like_Czarnas(sol)    
+    # guarded tries
+    try:
+        op_route_min(sol, data=data)
+    except:
+        t.cancel()
+        print "Failed removal from %s, still: %d." % (sol.task.name, sol.k+1)
+        exit()
+    else:
+        t.cancel()
+    sol.check_full()
+    sol.save('_rsm')
+    print_like_Czarnas(sol)   
+    print "Removed in %s, now: %s" % (sol.task.name, sol.infoline()), 
 
 @command
 def grout(args):
@@ -829,7 +884,7 @@ def _optimize(test, op, wall, intvl):
         print_like_Czarnas(sol)
         next_feedback = time.time()+intvl
     print "Wall time reached for %s." % test.name
-    save_solution(sol)
+    sol.save()
     print(sol.mem)
     print_like_Czarnas(sol)
     return sol
@@ -1052,7 +1107,7 @@ def poolchain(args):
         print "Possible rubbish in output"
     
     print "Best solution chosen. Saving.", time.time()-began
-    save_solution(sol, '_pc') # suffix for poolchain
+    sol.save('_pc') # suffix for poolchain
     print_like_Czarnas(sol)
     print "summary:", sol.task.name, "%d %.1f"%sol.val(), "%.1f %.1f"%sol.percentage(), 
     print "wall", args.wall, "workers", num_workers, "op", args.op, 'best_k',
@@ -1115,7 +1170,7 @@ def get_argument_parser():
             "--wall", "-w", type=int, default=600,
             help="approximate walltime (real) in seconds")
         parser.add_argument(
-            "--intvl", type=int, default=3,
+            "--intvl", type=int, default=10,
             help="approximate refresh rate (delay between messages)")
         parser.add_argument(
             "--strive", action="store_true",
