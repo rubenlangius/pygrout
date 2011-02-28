@@ -75,6 +75,14 @@ def union(*args):
     sum_of_all = set.union(*sets)
     print_grouped(sum_of_all)
 
+def raw_union(*args):
+    """Print the union of arguments, one per line, no bubblegum."""
+    return "\n".join(sorted(set.union(*map(read_as_set, args))))
+
+def raw_intersection(*args):
+    """Print the union of arguments, one per line, no bubblegum."""
+    return "\n".join(sorted(set.intersection(*map(read_as_set, args))))
+    
 def intersection(*args):
     """Set intersection of one (two) or more files."""
     if len(args) < 1:

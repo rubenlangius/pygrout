@@ -13,10 +13,6 @@ import cPickle
 
 import numpy as np
 
-# for imports in some environments (now 'if' guarded)
-if '.' not in sys.path:
-    sys.path.append('.')
-
 # additional modules
 from consts import *
 from compat import *
@@ -731,6 +727,7 @@ def find_replace_pos_on(sol, c, r):
             continue
         if arr_a > c_b:
             break
+        
     return None
     
 def short_light_route(sol):
@@ -743,6 +740,7 @@ def short_light_route(sol):
     return min( (sol.r[i][R_LEN], i) for i in candidates )[1]
     
 def remove_route(sol, r):
+    """Remove a route and retur a list of its customers."""
     data = u.pop(sol.r, r)
     cust = map(itemgetter(0), data[R_EDG])[1:]
     u.ada(sol, 'k', -1)
@@ -804,6 +802,19 @@ def resume(args):
     op_route_min(sol, data=data)
     print_like_Czarnas(sol)    
 
+@command
+def grout(args):
+    """Postprocess a solution using the proprietary grout program."""
+    import grout
+    sol = load_solution(args.test)
+    grout.DataLoader_load(sol.task.filename)
+    rk = grout.SolutionDistanceDecreaser()
+    rk.inflate(sol.flatten())
+    rk.setMaxEpochs(60)
+    best = grout.Solution()
+    rk.simulatedAnnealing(best)
+    print best.flatten()
+    
 def _optimize(test, op, wall, intvl):
     """An optimization funtion, which does not use argparse namespace."""
     sol = VrptwSolution(VrptwTask(test))
@@ -862,6 +873,7 @@ def load_solution(f):
     except: pass    
     if not sol.check_full():
         return None
+    print "Solution loaded:", sol.infoline()
     return sol
     
 @command
