@@ -512,6 +512,7 @@ def mpi_master(sol, comm, size, args):
     my_dist = sol.task.dist.sum()
     stat = MPI.Status()
     time_to_die = time.time() + args.wall
+    started = time.time()
 
     # initial jobs - creating initial solutions
     jobs = deque([('initial', k) for k in sort_keys.keys()])
@@ -526,7 +527,10 @@ def mpi_master(sol, comm, size, args):
     while workers > 0:
         resp = comm.recv(source=MPI.ANY_SOURCE, status=stat)
         if time.time() < time_to_die and len(jobs)>0:
-            comm.send(jobs.popleft(), dest=stat.Get_source())
+            job = jobs.popleft()
+            while len(jobs) > 2000 and job[0]=='killroute' and job[2][0] > my_k+1:
+                job = jobs.popleft()
+            comm.send(job, dest=stat.Get_source())
         else:
             comm.send(('done',), dest = stat.Get_source())
             workers -= 1
@@ -535,17 +539,19 @@ def mpi_master(sol, comm, size, args):
             essence = resp[2]
             if (my_k, my_dist) > essence[:2]:
                 sol.set_essence(essence)
+                sol.loghist()
                 my_k = sol.k
                 my_dist = sol.dist
-                print "New best:", my_k, my_dist
-            if k < my_k + 2:
+                print "%.1f s, new best:" % (time.time()-started), sol.infoline()
+            if essence[0] < my_k + 2:
                 for x in xrange(essence[0]):
                     jobs.append(('killroute', x, essence))
-        if len(jobs) > 100000 and time_to_die <> 0:
-            print "We've got problems"
+        if len(jobs) > 1000000 and time_to_die <> 0:
+            print "We've got problems, %.1f s" % (time.time()-started)
             time_to_die = 0
     if len(jobs) == 0:
-        print "The jobs went out"
+        print "The jobs went out, %.1f s" % (time.time()-started)
+    sol.save('_clus')
     exit()
 
 def mpi_worker(sol, comm, rank, args):
