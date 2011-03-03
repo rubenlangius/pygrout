@@ -414,8 +414,9 @@ def find_replace_pos_on(sol, c, r):
 
 def find_replace_pos(sol, c):
     for r in xrange(len(sol.r)):
-        for distinc, pos in find_replace_pos_on(sol, c, r):
-            yield (distinc, r, pos)
+        if sol.r[r][R_LEN] > 2:
+            for distinc, pos in find_replace_pos_on(sol, c, r):
+                yield (distinc, r, pos)
             
 def short_light_route(sol):
     """Return the index of the shortest of the three lightest routes."""
@@ -438,8 +439,10 @@ def remove_route(sol, r):
 def op_route_min(sol, route=None, random=r.random, randint=r.randint, data=dict(die=0)):
     """Emulate the route minimization (RM) heuristic by Nagata et al."""
     from collections import deque, defaultdict
-    
-    r = route or short_light_route(sol)
+    if route is None:
+        r = short_light_route(sol)
+    else:
+        r = route
     # print "I'll try to eliminate route", r+1
     ep = deque(remove_route(sol, r))
     # print "%d customers left to go:"% len(ep), ep
@@ -479,7 +482,7 @@ def op_route_min(sol, route=None, random=r.random, randint=r.randint, data=dict(
         
         pos = sorted(find_replace_pos(sol, c))
         if pos:
-            print "Positions there:", pos
+            #print "Positions there:", pos
             #raw_input()
             _, r, p = pos[randint(0, min(5,len(pos)-1))]
             put_to_ep(remove_customer(sol, r, p), False)
@@ -504,25 +507,69 @@ def command(func):
 def mpi_master(sol, comm, size, args):
     from mpi4py import MPI
     essencs = []
+    # 'inifinite' values:
+    my_k = sol.task.N
+    my_dist = sol.task.dist.sum()
     stat = MPI.Status()
-    command = ('fireabnt',)
+    time_to_die = time.time() + args.wall
+
+    # initial jobs - creating initial solutions
+    jobs = deque([('initial', k) for k in sort_keys.keys()])
+    if len(jobs) < size+5:
+        jobs.extend([('initial', 'by_random_ord')]*(size+5-len(jobs)))
+    print "initial jobs are:", jobs
     for i in xrange(1, size):
-        comm.send(command, dest=i)
-    workers = size-1
+        comm.send(jobs.popleft(), dest=i)
     
+    # working loop
+    workers = size-1    
     while workers > 0:
         resp = comm.recv(source=MPI.ANY_SOURCE, status=stat)
-        if resp[0] == 'bye':
+        if time.time() < time_to_die and len(jobs)>0:
+            comm.send(jobs.popleft(), dest=stat.Get_source())
+        else:
+            comm.send(('done',), dest = stat.Get_source())
             workers -= 1
+        
+        if resp[0] == 'initial' or resp[1] == 'ok':
+            essence = resp[2]
+            if (my_k, my_dist) > essence[:2]:
+                sol.set_essence(essence)
+                my_k = sol.k
+                my_dist = sol.dist
+                print "New best:", my_k, my_dist
+            if k < my_k + 2:
+                for x in xrange(essence[0]):
+                    jobs.append(('killroute', x, essence))
+        if len(jobs) > 100000 and time_to_die <> 0:
+            print "We've got problems"
+            time_to_die = 0
+    if len(jobs) == 0:
+        print "The jobs went out"
     exit()
 
-def mpi_worker(sol, comm, args):
+def mpi_worker(sol, comm, rank, args):
+    # maybe start working immediately
     while True:
         orders = comm.recv(source=0)
-        if orders[0] == 'fireabnt':
-            resp = ('bye',)
-            comm.send(resp, dest=0)
+        # print rank, "recieved orders:", orders
+        if orders[0] == 'done':
             break
+        elif orders[0] == 'initial':
+            VrptwTask.sort_order = orders[1]
+            build_first(sol)
+            comm.send(('initial','ok', sol.get_essence()), dest=0)
+        elif orders[0] == 'killroute':
+            sol.set_essence(orders[2])
+            try:
+                op_route_min(sol, orders[1])
+                comm.send(('killroute', 'ok', sol.get_essence()), dest=0)
+            except RuntimeError:
+                comm.send(('killroute', 'failed'), dest=0)
+        else:
+            print rank, "orders not understood", orders
+            
+    print "Bye from worker", rank
     exit()
 
 @command
@@ -541,7 +588,7 @@ def cluster(args):
     if rank == 0:
         mpi_master(sol, comm, size, args)
     else:
-        mpi_worker(sol, comm, args)
+        mpi_worker(sol, comm, rank, args)
     
 # POSTPROCESSING of old solutions
 
