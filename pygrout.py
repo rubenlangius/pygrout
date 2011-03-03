@@ -334,9 +334,6 @@ def local_search(sol, oper, end=0, verb=False, speed=None):
     sol.loghist()
     return sol
     
-                
-def simulated_annealing(sol, oper):
-    pass
 
 # MISC. SOLUTION FUNCTIONS - postprocessing
 
@@ -437,21 +434,21 @@ def remove_route(sol, r):
     u.ada(sol, 'dist', -data[R_DIS])    
     return cust
 
-#@operation
-def op_route_min(sol, random=r.random, randint=r.randint, data=dict(die=0)):
+@operation
+def op_route_min(sol, route=None, random=r.random, randint=r.randint, data=dict(die=0)):
     """Emulate the route minimization (RM) heuristic by Nagata et al."""
     from collections import deque, defaultdict
     
-    r = short_light_route(sol)
-    print "I'll try to eliminate route", r+1
+    r = route or short_light_route(sol)
+    # print "I'll try to eliminate route", r+1
     ep = deque(remove_route(sol, r))
-    print "%d customers left to go:"% len(ep), ep
+    # print "%d customers left to go:"% len(ep), ep
     
     def insert(c, r, pos, ep):
-        print "Customer %d goes to %d at pos %d" % (c, r+1, pos)
+        # print "Customer %d goes to %d at pos %d" % (c, r+1, pos)
         insert_at_pos(sol, c, r, pos)
         #print_like_Czarnas(sol)
-        print "Still left are:", ep
+        # print "Still left are:", ep
         
     recycled = defaultdict(int)
     def put_to_ep(c, front=True):
@@ -461,10 +458,10 @@ def op_route_min(sol, random=r.random, randint=r.randint, data=dict(die=0)):
             ep.append(c)
             
         recycled[c] += 1
-        print "Next (%d) round for %d" % (c, recycled[c])
+        # print "Next (%d) round for %d" % (c, recycled[c])
         
         if any(recycled[x] > 5 for x in ep):
-            print "Too much recycling in the EP: dead end"
+            # print "Too much recycling in the EP: dead end"
             raise RuntimeError
         
     while len(ep) > 0 and not data['die']:
@@ -484,7 +481,7 @@ def op_route_min(sol, random=r.random, randint=r.randint, data=dict(die=0)):
         if pos:
             print "Positions there:", pos
             #raw_input()
-            _, r, p = pos[0]
+            _, r, p = pos[randint(0, min(5,len(pos)-1))]
             put_to_ep(remove_customer(sol, r, p), False)
             insert(c, r, p, ep)
             continue
@@ -501,6 +498,52 @@ def command(func):
     """A command decorator - the decoratee should be a valid command."""
     commands.add(func.__name__)
     return func
+
+# the CLUSTER command - mpi4py parallelism
+
+def mpi_master(sol, comm, size, args):
+    from mpi4py import MPI
+    essencs = []
+    stat = MPI.Status()
+    command = ('fireabnt',)
+    for i in xrange(1, size):
+        comm.send(command, dest=i)
+    workers = size-1
+    
+    while workers > 0:
+        resp = comm.recv(source=MPI.ANY_SOURCE, status=stat)
+        if resp[0] == 'bye':
+            workers -= 1
+    exit()
+
+def mpi_worker(sol, comm, args):
+    while True:
+        orders = comm.recv(source=0)
+        if orders[0] == 'fireabnt':
+            resp = ('bye',)
+            comm.send(resp, dest=0)
+            break
+    exit()
+
+@command
+def cluster(args):
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    size = comm.Get_size()
+    rank = comm.Get_rank()
+    
+    if size < 2:
+        print "Sorry, only for > 1 process"
+        exit()
+    
+    sol = VrptwSolution(VrptwTask(args.test))
+    
+    if rank == 0:
+        mpi_master(sol, comm, size, args)
+    else:
+        mpi_worker(sol, comm, args)
+    
+# POSTPROCESSING of old solutions
 
 @command
 def resume(args):
@@ -542,6 +585,8 @@ def grout(args):
     sol.inflate(best.flatten())
     sol.save('_grout')
     print best.flatten()
+
+# LOCAL SEARCH related techniques
     
 def _optimize(test, op, wall, intvl):
     """An optimization funtion, which does not use argparse namespace."""
