@@ -13,7 +13,8 @@ import cPickle
 import numpy as np
 
 # additional modules
-from vrptw import VrptwTask, VrptwSolution, u, r, sort_keys
+from vrptw import VrptwTask, VrptwSolution, u, r, sort_keys, \
+                  propagate_arrival, propagate_deadline
 
 from consts import *
 from compat import *
@@ -34,38 +35,6 @@ def insert_new(sol, c):
     u.ins(sol.r, sol.k, new_route)
     u.atr(sol, 'k', sol.k+1)                      # route no inc
     u.atr(sol, 'dist', sol.dist+new_route[R_DIS]) # total distance inc
-
-def propagate_arrival(sol, r, pos):
-    """Update arrivals (actual service begin) on a route after pos."""
-    edges = sol.r[r][R_EDG]
-    time = sol.task.time
-    cust = sol.task.cust
-    a, b, arr_a, _ = edges[pos]
-    for idx in xrange(pos+1, len(edges)):
-        b, _, old_arrival, _ = edges[idx]
-        new_arrival = max(arr_a + time[a][b], cust[b][A])
-        # check, if there is a modification
-        if new_arrival == old_arrival:
-            break
-        u.set(edges[idx], E_ARF, new_arrival)
-        a = b
-        arr_a = new_arrival
-
-def propagate_deadline(sol, r, pos):
-    """Update deadlines (latest legal service begin) on a route before pos."""
-    edges = sol.r[r][R_EDG]
-    _, b, _, larr_b = edges[pos]
-    time = sol.task.time
-    cust = sol.task.cust
-    for idx in xrange(pos-1, -1, -1):
-        _, a, _, old_deadline = edges[idx]
-        new_deadline = min(larr_b-time[a][b], cust[a][B])
-        # check, if there is a modification
-        if new_deadline == old_deadline:
-            break
-        u.set(edges[idx], E_LAT, new_deadline)
-        b = a
-        larr_b = new_deadline
 
 def insert_at_pos(sol, c, r, pos):
     """Inserts c into route ad pos. Does no checks."""
@@ -565,11 +534,13 @@ def grout(args):
     import grout
     sol = load_solution(args.test)
     grout.DataLoader_load(sol.task.filename)
-    rk = grout.SolutionDistanceDecreaser()
-    rk.inflate(sol.flatten())
-    rk.setMaxEpochs(60)
+    dd = grout.DistanceDecreaser()
+    dd.inflate(sol.flatten())
+    dd.setMaxEpochs(60)
     best = grout.Solution()
-    rk.simulatedAnnealing(best)
+    dd.simulatedAnnealing(best)
+    sol.inflate(best.flatten())
+    sol.save('_grout')
     print best.flatten()
     
 def _optimize(test, op, wall, intvl):
