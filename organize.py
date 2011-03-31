@@ -18,11 +18,18 @@ def read_as_set(f):
     """Read the file and return set of lines."""
     return set(map(str.strip, open(f)))
 
+def split_groups(s):
+    """Insert newlines before first occurence of a group."""
+    for g in "c2 r1 r2 rc1 rc2".split():
+        s, _ = re.subn(r"\s%s"%g, "\n%s"%g, s, count=1)
+    return s
+  
 def printf(set_):
     """Used to display a set, with count, sorted and textwrapped."""
     print "(%d)"%len(set_)
     un_derscore = lambda x: x.replace('_', '0')
-    print textwrap.fill(" ".join(sorted(set_, key=un_derscore)))
+    splat = split_groups(" ".join(sorted(set_, key=un_derscore)))
+    print "\n\n".join(textwrap.fill(l) for l in splat.split("\n"))
 
 def print_grouped(sum_of_all):
     """Output with printf, but Solomon and Homberger separately."""
