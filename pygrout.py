@@ -414,6 +414,7 @@ def find_replace_pos_on(sol, c, r):
 
 def find_replace_pos(sol, c):
     for r in xrange(len(sol.r)):
+        # replacing single customer makes little sense
         if sol.r[r][R_LEN] > 2:
             for distinc, pos in find_replace_pos_on(sol, c, r):
                 yield (distinc, r, pos)
@@ -546,6 +547,9 @@ def mpi_master(sol, comm, size, args):
             if essence[0] < my_k + 2:
                 for x in xrange(essence[0]):
                     jobs.append(('killroute', x, essence))
+        elif resp[0] == 'killroute' and resp[1] == 'failed':
+            pass # TODO: no idea what failed... (not sent)
+            
         if len(jobs) > 1000000 and time_to_die <> 0:
             print "We've got problems, %.1f s" % (time.time()-started)
             time_to_die = 0
@@ -571,7 +575,10 @@ def mpi_worker(sol, comm, rank, args):
                 op_route_min(sol, orders[1])
                 comm.send(('killroute', 'ok', sol.get_essence()), dest=0)
             except RuntimeError:
-                comm.send(('killroute', 'failed'), dest=0)
+                u.undo()
+                comm.send(('killroute', 'failed', sol.get_essence()), dest=0)
+        elif orders[0] == 'perturb':
+            pass
         else:
             print rank, "orders not understood", orders
             
