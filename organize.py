@@ -8,6 +8,16 @@ import textwrap
 # regex to remove the non-setname part of name
 cutoff = re.compile('-.*')
 
+class smallstat(object):
+    """Like a little defaultdict(int), but contigous."""
+    def __init__(self):
+        self.data = [0]
+    def inc(self, idx, inc=1):
+        """Increment the index idx by inc(=1), create in needed."""
+        if idx >= len(self.data):
+            self.data.extend([0]*(1+idx-len(self.data)))
+        self.data[idx] += inc
+    
 def find_medium(test):
     """Glob and return all but the 'smallest' and 'largest' files."""
     # missing case-insensitive glob. Besides, this Solomon's mess
@@ -249,6 +259,13 @@ def main():
     create_file('100s/always.txt', sets_always)
     raw_input('Done. Press ENTER')
 
+def draw_map(*args):
+    """Plot the solutions route count as squares in color with mpl"""
+    
+def get_best_results():
+    """Load a dictionary with best known result tuples."""
+    pat = os.path.join(os.path.dirname(__file__), 'bestknown')
+                
 # global list of functions
 from types import FunctionType
 funcs = filter(lambda k: type(globals()[k])==FunctionType, globals().keys())
@@ -258,7 +275,9 @@ if __name__ == '__main__':
     import sys
     if len(sys.argv) > 1 and sys.argv[1] in funcs:
         # call function passing other args as params
-        print globals()[sys.argv[1]](*sys.argv[2:])
+        res = globals()[sys.argv[1]](*sys.argv[2:])
+        if not res is None:
+            print res
     else:
         main()
 
