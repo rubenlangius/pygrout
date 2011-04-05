@@ -6,6 +6,17 @@ try:
 except: 
     numpy = type('dummy', (object,), dict(float64=float))()
 
+def test_deepmap():
+    """Check the utility for mapping nested lists and dictionaries."""
+    from organize import deepmap
+    from math import sqrt
+    plain_list = [1, 3, 2]
+    assert deepmap(lambda x: x+1, plain_list) == [2, 4, 3]
+    plain_dict = dict(a='hi', b='there')
+    assert deepmap(str.upper, plain_dict)==dict(a='HI', b='THERE')
+    nested = {'a': [0, 4, 16], 'b': [1, 9, 25]}
+    assert deepmap(sqrt, nested)=={'a': [0., 2., 4.], 'b':[1., 3., 5.]}
+    
 def _rec_assert_simmilar(a, b):
     assert type(a)==type(b), 'wrong types: %s and %s' % (type(a), type(b))
     if type(a) == list or type(a)==tuple:

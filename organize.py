@@ -264,7 +264,24 @@ def draw_map(*args):
     
 def get_best_results():
     """Load a dictionary with best known result tuples."""
-    pat = os.path.join(os.path.dirname(__file__), 'bestknown')
+    pat = os.path.join(os.path.dirname(__file__), 'bestknown', 'sum*')
+    data = {}
+    for summ in glob.glob(pat):
+        for line in open(summ):
+            test, k, dist = line.split()
+            data[test.lower()] = (int(k), float(dist))
+    return data
+        
+def deepmap(f, something):
+    """Map a nested structure, keeping the layout."""
+    if type(something) == list:
+        return [deepmap(f, x) for x in something]
+    elif type(something) == tuple:
+        return tuple(deepmap(f, list(something)))
+    elif type(something) == dict:
+        return dict([(k, deepmap(f, something[k])) for k in something])
+    else:
+        return f(something)
                 
 # global list of functions
 from types import FunctionType
