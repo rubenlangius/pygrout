@@ -8,6 +8,11 @@ import textwrap
 # regex to remove the non-setname part of name
 cutoff = re.compile('-.*')
 
+fnparse = re.compile("""
+(?P<name>[rcRC]{1,2}[12](?:\d{2}|[\d_]{4}))
+-(?P<pk>[\d.]+)-(?P<pdist>[\d.]+)
+-(?P<k>\d+)-(?P<dist>[\d.]+)-""", re.VERBOSE)
+
 class smallstat(object):
     """Like a little defaultdict(int), but contigous."""
     def __init__(self):
@@ -282,7 +287,40 @@ def deepmap(f, something):
         return dict([(k, deepmap(f, something[k])) for k in something])
     else:
         return f(something)
-                
+        
+def plot_excess_routes():
+    """Display a histogram of excess routes in solutions."""
+    best = get_best_results()
+    stats = smallstat()
+    mem = set()
+    for dirpath, _, filenames in os.walk('.'):
+        for f in filenames:
+            m = fnparse.search(f)
+            if m:
+                print f, m.group()
+                if m.group() in mem:
+                    print "duplicate"
+                    continue
+                mem.add(m.group())
+                d = m.groupdict()
+                bk = best[d['name'].lower()]
+                print d['name'], bk, int(d['k'])-bk[0]
+                stats.inc(int(d['k'])-bk[0])
+    print stats.data, len(stats.data), sum(stats.data)
+    from pylab import bar, show, xlabel, ylabel, title, xticks
+    bar(range(len(stats.data)), stats.data)
+    xlabel('Excess routes')
+    ylabel('No. of solutions')
+    std_title = os.path.basename(os.getcwd())
+    cust_title = raw_input('Enter title (%s): '%std_title)
+    title(cust_title if cust_title <> '' else std_title)
+    locs, _ = xticks()
+    if locs[1] < 1: 
+        xticks(range(len(stats.data)))
+    print locs
+    show()
+        
+    
 # global list of functions
 from types import FunctionType
 funcs = filter(lambda k: type(globals()[k])==FunctionType, globals().keys())
