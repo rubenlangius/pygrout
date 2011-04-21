@@ -288,11 +288,12 @@ def deepmap(f, something):
     else:
         return f(something)
         
-def plot_excess_routes():
+def plot_excess_routes(*args):
     """Display a histogram of excess routes in solutions."""
     best = get_best_results()
     stats = smallstat()
     mem = set()
+    lst = []
     for dirpath, _, filenames in os.walk('.'):
         for f in filenames:
             m = fnparse.search(f)
@@ -304,10 +305,15 @@ def plot_excess_routes():
                 mem.add(m.group())
                 d = m.groupdict()
                 bk = best[d['name'].lower()]
-                print d['name'], bk, int(d['k'])-bk[0]
-                stats.inc(int(d['k'])-bk[0])
+                ex = int(d['k'])-bk[0]
+                print d['name'], bk, ex
+                stats.inc(ex)
+                lst.append(ex)
     print stats.data, len(stats.data), sum(stats.data)
-    from pylab import bar, show, xlabel, ylabel, title, xticks
+    from pylab import bar, show, xlabel, ylabel, title, xticks,hist
+    if len(args)>0:
+        import IPython
+        IPython.Shell.IPShellEmbed()()
     bar(range(len(stats.data)), stats.data)
     xlabel('Excess routes')
     ylabel('No. of solutions')

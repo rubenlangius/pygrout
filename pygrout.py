@@ -16,7 +16,7 @@ import numpy as np
 from vrptw import VrptwTask, VrptwSolution, u, r, sort_keys, \
                   propagate_arrival, propagate_deadline
 
-from consts import *
+from vrptw.consts import *
 from compat import *
         
 # THE MODEL - basic operations on a solution (through UndoStack
@@ -212,6 +212,8 @@ def find_allpos_on(sol, c, r, startpos=0):
         arr_c  = max(arr_a + time[a][c], c_a) # earliest possible
         larr_c = min(c_b, larr_b-time[c][b]) # latest if c WAS here
         larr_a = min(cust[a][B], larr_c-time[a][c])
+        if  arr_c <= larr_c and not arr_a <= larr_a:
+            print "yes, this ever happens..."
         if  arr_c <= larr_c and arr_a <= larr_a:
             # for some cases distinc in optional...
             distinc = -(dist[a][c] + dist[c][b] - dist[a][b])

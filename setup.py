@@ -6,5 +6,7 @@ setup(name='Pygrout',
       description='VRPTW solving utility',
       author='Tomasz Gandor',
       url='http://code.google.com/p/pygrout/',
-      py_modules=['pygrout', 'consts', 'compat', 'undo']
+      packages=['vrptw'],
+      package_data = { 'vrptw': 'bestknown/*.txt' },
+      py_modules=['pygrout', 'compat', 'undo']
      )
