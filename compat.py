@@ -1,4 +1,4 @@
-from consts import *
+from vrptw.consts import *
 from itertools import count
 
 def pairs(iterable):
