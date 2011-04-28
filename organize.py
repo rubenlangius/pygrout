@@ -22,7 +22,29 @@ class smallstat(object):
         if idx >= len(self.data):
             self.data.extend([0]*(1+idx-len(self.data)))
         self.data[idx] += inc
-    
+
+def multibar(*args, **kwargs):
+    """Plot multiple bar charts like for comparison, with pylab."""
+    from pylab import bar, show
+    import numpy as np
+    width = kwargs.setdefault('width', 0.8)
+    left =  kwargs.setdefault('left', None)
+    offset = 0
+    results = []
+    print args, kwargs
+    for arg in args:
+        if type(arg) is tuple:
+            myleft, arg = arg  
+            myleft = np.array(myleft) + offset
+        elif not left is None:
+            myleft = np.array(left) + offset
+        else:
+            myleft = np.arange(len(arg)) + offset
+        res = bar(myleft, arg, width=width/len(args))
+        results.append(res)
+        offset += width/len(args)
+    return results
+
 def find_medium(test):
     """Glob and return all but the 'smallest' and 'largest' files."""
     # missing case-insensitive glob. Besides, this Solomon's mess
@@ -269,7 +291,8 @@ def draw_map(*args):
     
 def get_best_results():
     """Load a dictionary with best known result tuples."""
-    pat = os.path.join(os.path.dirname(__file__), 'bestknown', 'sum*')
+    import vrptw
+    pat = os.path.join(os.path.dirname(vrptw.__file__), 'bestknown', 'sum*')
     data = {}
     for summ in glob.glob(pat):
         for line in open(summ):
