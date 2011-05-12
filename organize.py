@@ -26,12 +26,14 @@ class smallstat(object):
 def multibar(*args, **kwargs):
     """Plot multiple bar charts like for comparison, with pylab."""
     from pylab import bar, show
+    from itertools import cycle
     import numpy as np
     width = kwargs.setdefault('width', 0.8)
-    left =  kwargs.setdefault('left', None)
+    left = kwargs.setdefault('left', None)
+    colors = cycle(kwargs.setdefault('colors', 'brgmcyk'))
     offset = 0
+    delta = width/len(args)
     results = []
-    print args, kwargs
     for arg in args:
         if type(arg) is tuple:
             myleft, arg = arg  
@@ -40,9 +42,9 @@ def multibar(*args, **kwargs):
             myleft = np.array(left) + offset
         else:
             myleft = np.arange(len(arg)) + offset
-        res = bar(myleft, arg, width=width/len(args))
+        res = bar(myleft, arg, width=delta, color=colors.next())
         results.append(res)
-        offset += width/len(args)
+        offset += delta
     return results
 
 def find_medium(test):
@@ -311,33 +313,38 @@ def deepmap(f, something):
     else:
         return f(something)
         
+def enter_ipython(extra_locals = dict()):
+    import IPython
+    IPython.Shell.IPShellEmbed()()
+    locals().update(extra_locals)
+
 def plot_excess_routes(*args):
     """Display a histogram of excess routes in solutions."""
     best = get_best_results()
-    stats = smallstat()
-    mem = set()
-    lst = []
-    for dirpath, _, filenames in os.walk('.'):
-        for f in filenames:
-            m = fnparse.search(f)
-            if m:
-                print f, m.group()
-                if m.group() in mem:
-                    print "duplicate"
-                    continue
-                mem.add(m.group())
-                d = m.groupdict()
-                bk = best[d['name'].lower()]
-                ex = int(d['k'])-bk[0]
-                print d['name'], bk, ex
-                stats.inc(ex)
-                lst.append(ex)
-    print stats.data, len(stats.data), sum(stats.data)
-    from pylab import bar, show, xlabel, ylabel, title, xticks,hist
-    if len(args)>0:
-        import IPython
-        IPython.Shell.IPShellEmbed()()
-    bar(range(len(stats.data)), stats.data)
+    
+    def get_stats(path):
+        stats = smallstat()
+        mem = set()
+        for dirpath, _, filenames in os.walk(path):
+            for f in filenames:
+                m = fnparse.search(f)
+                if m:
+                    print f, m.group()
+                    if m.group() in mem:
+                        print "duplicate"
+                        continue
+                    mem.add(m.group())
+                    d = m.groupdict()
+                    bk = best[d['name'].lower()]
+                    ex = int(d['k'])-bk[0]
+                    # print d['name'], bk, ex
+                    stats.inc(ex)
+        return stats.data
+    
+    if len(args) == 0:
+        args = ['.']
+    from pylab import show, xlabel, ylabel, title, xticks,hist
+    multibar(*map(get_stats, args))
     xlabel('Excess routes')
     ylabel('No. of solutions')
     std_title = os.path.basename(os.getcwd())
