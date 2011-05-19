@@ -299,12 +299,15 @@ def draw_map(*args):
     for i in xrange(6):
         subplot(230+i+1)
         for j in xrange(sol_counts[groups[i]]):
+            name = groups[i]+ "%02d" % (j+1)
+            print name, j, 0
             bar(j, 0.8, color=next(colors))
         base = 1
         homb_numbers = ['_%d' % (n+1,) for n in xrange(9)]+['10']
         for size in "_2 _4 _6 _8 10".split():
             for j in xrange(10):
-                print groups[i]+size+homb_numbers[j], j, base
+                name = groups[i]+size+homb_numbers[j] 
+                print name, j, base
                 bar(j, 0.8, bottom=base, color=next(colors))
             base += 1
         title(groups[i])
