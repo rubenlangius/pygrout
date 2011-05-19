@@ -290,6 +290,25 @@ def main():
 
 def draw_map(*args):
     """Plot the solutions route count as squares in color with mpl"""
+    sol_counts = dict([('c1', 9), ('c2', 8), ('r1', 12), ('r2', 11), 
+                       ('rc1', 8), ('rc2', 8) ])
+    from matplotlib.pyplot import subplot, show, bar, title
+    from itertools import cycle
+    groups = 'c1 r1 rc1 c2 r2 rc2'.split()
+    colors = cycle('rgb')
+    for i in xrange(6):
+        subplot(230+i+1)
+        for j in xrange(sol_counts[groups[i]]):
+            bar(j, 0.8, color=next(colors))
+        base = 1
+        homb_numbers = ['_%d' % (n+1,) for n in xrange(9)]+['10']
+        for size in "_2 _4 _6 _8 10".split():
+            for j in xrange(10):
+                print groups[i]+size+homb_numbers[j], j, base
+                bar(j, 0.8, bottom=base, color=next(colors))
+            base += 1
+        title(groups[i])
+    show()
     
 def get_best_results():
     """Load a dictionary with best known result tuples."""
