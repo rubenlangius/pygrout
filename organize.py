@@ -5,6 +5,8 @@ import re
 import glob
 import textwrap
 
+from collections import defaultdict
+
 # regex to remove the non-setname part of name
 cutoff = re.compile('-.*')
 
@@ -288,31 +290,52 @@ def main():
     create_file('100s/always.txt', sets_always)
     raw_input('Done. Press ENTER')
 
-def draw_map(*args):
+def draw_map(colors = defaultdict((lambda: ('w', ' ')))):
     """Plot the solutions route count as squares in color with mpl"""
     sol_counts = dict([('c1', 9), ('c2', 8), ('r1', 12), ('r2', 11), 
                        ('rc1', 8), ('rc2', 8) ])
     from matplotlib.pyplot import subplot, show, bar, title
     from itertools import cycle
     groups = 'c1 r1 rc1 c2 r2 rc2'.split()
-    colors = cycle('rgb')
     for i in xrange(6):
         subplot(230+i+1)
         for j in xrange(sol_counts[groups[i]]):
             name = groups[i]+ "%02d" % (j+1)
-            print name, j, 0
-            bar(j, 0.8, color=next(colors))
+            print name, j, 0, colors[name]
+            bar(j, 0.8, color=colors[name][0], hatch=colors[name][1])
         base = 1
         homb_numbers = ['_%d' % (n+1,) for n in xrange(9)]+['10']
         for size in "_2 _4 _6 _8 10".split():
             for j in xrange(10):
                 name = groups[i]+size+homb_numbers[j] 
-                print name, j, base
-                bar(j, 0.8, bottom=base, color=next(colors))
+                print name, j, base, colors[name]
+                bar(j, 0.8, bottom=base, color=colors[name][0], hatch=colors[name][1])
             base += 1
         title(groups[i])
     show()
-    
+
+def scan_solutions(path = '.'):
+    data = dict()
+    for dirpath, _, filenames in os.walk(path):
+        for f in filenames:
+            m = fnparse.search(f)
+            if m:
+                print f, m.group()
+                d = m.groupdict()
+                data.setdefault(d['name'].lower(), []).append((int(d['k']), float(d['dist'])))
+    for s in data:
+        data[s].sort()
+    return data
+
+def k_map():
+    best = get_best_results()
+    results = scan_solutions('.')
+    data = defaultdict((lambda: ('gray', ' ')))
+    for r in results:
+        if best[r][0] == results[r][0][0]:
+            data[r] = ('green', '/')
+    draw_map(data)
+
 def get_best_results():
     """Load a dictionary with best known result tuples."""
     import vrptw
