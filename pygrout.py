@@ -621,7 +621,7 @@ def resume(args):
     print_like_Czarnas(sol)
     # guarded tries
     try:
-        op_route_min(sol, data=data)
+        op_route_min(sol, pick_short_route(sol), data=data)
     except:
         t.cancel()
         print "Failed removal from %s, still: %d." % (sol.task.name, sol.k+1)
@@ -904,10 +904,13 @@ def initials(args):
     """Produce initial solutions in all available ways, and 10x randomly."""
     sol = VrptwSolution(VrptwTask(args.test))
     results = []
+    best_order = None
     for k in sort_keys.keys():
         VrptwTask.sort_order = k
         build_first(sol)
         results.append((sol.percentage(), k, sol.k))
+        if min(results) == results[-1]:
+            best_order = k
     VrptwTask.sort_order = 'by_random_ord'
     for i in xrange(9):
         build_first(sol)
@@ -917,6 +920,10 @@ def initials(args):
         print "%-20s %.2f %.2f  routes %d  rank %02d %s" % (
               (k+':',)+prec+(sol_k, rank, sol.task.name))
         rank += 1
+    # best deterministic order
+    VrptwTask.sort_order = best_order
+    build_first(sol)
+    sol.save("_init")
 
 def get_argument_parser():
     """Create and configure an argument parser.
