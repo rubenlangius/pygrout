@@ -197,7 +197,6 @@ def main():
     """Main function - clean up a typical /output (sub)directory."""
     
     # helpers 
-    
     def create_file(fn, set_):
         if not os.path.exists(fn):
             open(fn, 'w').write("\n".join(sorted(set_)))
@@ -290,8 +289,8 @@ def main():
     create_file('100s/always.txt', sets_always)
     raw_input('Done. Press ENTER')
 
-def draw_map(colors = defaultdict((lambda: ('w', ' ')))):
-    """Plot the solutions route count as squares in color with mpl"""
+def draw_map(colors = defaultdict((lambda: ('w', '/')))):
+    """Plot tests (solutions) as squares in color with mpl"""
     sol_counts = dict([('c1', 9), ('c2', 8), ('r1', 12), ('r2', 11), 
                        ('rc1', 8), ('rc2', 8) ])
     from matplotlib.pyplot import subplot, show, bar, title
@@ -310,11 +309,12 @@ def draw_map(colors = defaultdict((lambda: ('w', ' ')))):
                 name = groups[i]+size+homb_numbers[j] 
                 print name, j, base, colors[name]
                 bar(j, 0.8, bottom=base, color=colors[name][0], hatch=colors[name][1])
-            base += 1
+            base += 2
         title(groups[i])
     show()
 
 def scan_solutions(path = '.'):
+    """Search specified directories (default: current) for solutions."""
     data = dict()
     for dirpath, _, filenames in os.walk(path):
         for f in filenames:
@@ -328,14 +328,36 @@ def scan_solutions(path = '.'):
     return data
 
 def k_map():
+    """Plot a route count summary for solutions in/below current directory."""
     best = get_best_results()
     results = scan_solutions('.')
-    data = defaultdict((lambda: ('gray', ' ')))
+    data = defaultdict((lambda: ('white', '/')))
     for r in results:
-        if best[r][0] == results[r][0][0]:
-            data[r] = ('green', '/')
+        if best[r][0] >= results[r][0][0]:
+            data[r] = ('green', '')
+        elif best[r][0] + 1  == results[r][0][0]:
+            data[r] = ('yellow', '')
+        else:
+            data[r] = ('red', '')
     draw_map(data)
 
+def dist_map():
+    """Plot a distance summary for solutions in/below current directory.
+    Solutions with wrong route count are marked black."""
+    best = get_best_results()
+    results = scan_solutions('.')
+    data = defaultdict((lambda: ('white', '/')))
+    for r in results:
+        if best[r][0] < results[r][0][0]:
+            data[r] = ('black', '')
+        elif best[r][1] * 1.01  >= results[r][0][1]:
+            data[r] = ('green', '')
+        elif best[r][1] * 1.05  >= results[r][0][1]:
+            data[r] = ('yellow', '')
+        else:
+            data[r] = ('red', '')
+    draw_map(data)
+    
 def get_best_results():
     """Load a dictionary with best known result tuples."""
     import vrptw
@@ -359,9 +381,13 @@ def deepmap(f, something):
         return f(something)
         
 def enter_ipython(extra_locals = dict()):
+    """Run IPython embedded shell with added locals.
+    To debug a specific place in script just call:
+    enter_ipython(locals())
+    """
+    locals().update(extra_locals)
     import IPython
     IPython.Shell.IPShellEmbed()()
-    locals().update(extra_locals)
 
 def plot_excess_routes(*args):
     """Display a histogram of excess routes in solutions."""
@@ -415,5 +441,5 @@ if __name__ == '__main__':
         if not res is None:
             print res
     else:
-        main()
+        print "Use one, out of a subset, of these:\n  "+"\n  ".join(funcs)
 
