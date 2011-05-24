@@ -41,12 +41,13 @@ def get_hombergers_sintef():
         found =  homb.findall(data)
         for name, vehicles, distance in found:
             name = name.replace('_10', '10')
-            open('bestknown/%s.txt' % name, 'w').write(
-                '%s %s' % (vehicles, distance))
+            open('vrptw/bestknown/%s.txt' % name, 'w').write(
+                '%s %s\n' % (vehicles, distance))
             summary.append('%-7s %3s %s' % (name, vehicles, distance))
             print summary[-1]
         print "Downloaded %.1f KB in %.1f s (%.1f KB/s)" % (kb, s, kb/s)
-    open('bestknown/summary_H.txt', 'w').write("\n".join(sorted(summary)))
+    open('vrptw/bestknown/summary_H.txt', 'w').write("\n".join(sorted(summary,
+         key=lambda x: x.replace('_', '0')))) 
 
 def get_solomons():
     """Download best results for Solomons tests as published by himself."""
@@ -61,14 +62,15 @@ def get_solomons():
         found =  solo.finditer(data)
         for m in found:
             name, vehicles, distance = m.groups()
-            open('bestknown/%s.txt' % name, 'w').write(
-                '%s %s' % (vehicles, distance))
+            open('vrptw/bestknown/%s.txt' % name, 'w').write(
+                '%s %s\n' % (vehicles, distance))
             summary.append('%-10s %3s %7s' % (name, vehicles, distance))
             print summary[-1]
         s, kb = time.time()-start, len(data)/1024.0
         print "Downloaded %.1f KB in %.1f s (%.1f KB/s)" % (kb, s, kb/s)
-    open('bestknown/summary_S.txt', 'w').write("\n".join(sorted(summary)))
+    open('vrptw/bestknown/summary_S.txt', 'w').write("\n".join(sorted(summary,
+         key=lambda x: x.replace('_', '0')))) 
 
 if __name__ == '__main__':
     get_hombergers_sintef()
-    get_solomons()
+    # get_solomons()
