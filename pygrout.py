@@ -618,20 +618,21 @@ def resume(args):
     t = Timer(args.wall, die)
     t.start()
     sol = load_solution(args.test)
-    print_like_Czarnas(sol)
+    # print_like_Czarnas(sol)
+    tgt = pick_short_route(sol)
     # guarded tries
     try:
-        op_route_min(sol, pick_short_route(sol), data=data)
+        op_route_min(sol, tgt, data=data)
     except:
         t.cancel()
-        print "Failed removal from %s, still: %d." % (sol.task.name, sol.k+1)
-        exit()
+        print "Failed removal of %d from %s, still: %d." % (tgt, sol.task.name, sol.k+1)
+        exit(1)
     else:
         t.cancel()
     sol.check_full()
     sol.save('_rsm')
     print_like_Czarnas(sol)   
-    print "Removed in %s, now: %s" % (sol.task.name, sol.infoline()), 
+    print "Removed %d in %s, now: %s" % (tgt, sol.task.name, sol.infoline()), 
 
 @command
 def grout(args):
@@ -717,6 +718,7 @@ def load(args):
     sol = load_solution(args.test)
     print_like_Czarnas(sol)
     print sol.mem
+    print sol.get_signature()
     try:
         if len(sol.history):
             plot_history(sol)
@@ -725,7 +727,14 @@ def load(args):
     except ImportError:
         print "Plotting history impossible (missing GUI or matplotlib)"
 
-# POOLCHAIN metaheuristic and friends
+@command
+def export(args):
+    """Create other formats for saved solution, like .vrp"""
+    # TODO: real export; for now just print successors
+    sol = load_solution(args.test)
+    print "\n".join(str(s) for s in sol.get_successors())
+    
+# POOLCHAIN metaheuristic and friends_
 
 def worker(sol, pools, operators, config):
     """The actual working process in a poolchain."""
@@ -920,8 +929,12 @@ def initials(args):
         print "%-20s %.2f %.2f  routes %d  rank %02d %s" % (
               (k+':',)+prec+(sol_k, rank, sol.task.name))
         rank += 1
-    # best deterministic order
-    VrptwTask.sort_order = best_order
+    # best deterministic order, or the order given
+    # will be used for saving
+    if args.order is None:
+        VrptwTask.sort_order = best_order
+    else:
+        VrptwTask.sort_order = args.order
     build_first(sol)
     sol.save("_init")
 
@@ -977,6 +990,7 @@ def get_argument_parser():
                     VrptwSolution.outdir = values
                 elif option_string == '--order':
                     VrptwTask.sort_order = values
+                    namespace.order = values
                 elif option_string in ['-s', '--seed']:
                     global r_seed
                     r_seed = int(values)
