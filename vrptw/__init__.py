@@ -263,11 +263,12 @@ class VrptwSolution(object):
         node_sig = hex(uuid.getnode())[-4:]
         save_name = "%s-%s-%s-%02d-%05.1f-%s-%s.p" % (
                 sol.task.name, prec_k, prec_d, sol.k, sol.dist, 
-                node_sig, time_sig)
+                sol.get_signature()[:8], time_sig)
         sol.mem['save_name'] = save_name
         sol.mem['save_time'] = time.time()
         sol.mem['t_elapsed'] = time.time() - sol.mem['t_start']
         sol.mem['host_sig'] = node_sig
+        sol.mem['signature'] = sol.get_signature()
         save_data = dict(
             routes = sol.r,
             mem = sol.mem,
@@ -276,10 +277,17 @@ class VrptwSolution(object):
             name = sol.task.name,
             percentage = sol.percentage(),
             history = sol.history )
+            
         if not os.path.exists(sol.outdir):
             os.makedirs(sol.outdir)
-        cPickle.dump(save_data, open(os.path.join(sol.outdir, save_name), 'wb'))
-        open(os.path.join(sol.outdir, save_name.replace('.p', '.vrp')), 'w').write(sol.flatten())
+        target_path = os.path.join(sol.outdir, save_name)
+        if os.path.exists(target_path):
+            print "File %s - such solution already exists" % target_path
+        else:
+            cPickle.dump(save_data, open(target_path, 'wb'))
+            
+        # not writing the copy - use the export command
+        # open(os.path.join(sol.outdir, save_name.replace('.p', '.vrp')), 'w').write(sol.flatten())
         return sol     
     
     def copy(self):
@@ -301,6 +309,19 @@ class VrptwSolution(object):
     def set_essence(self, essence):
         """Set new routes and value: use with result of get_essence."""
         self.k, self.dist, self.r = essence
+        
+    def get_successors(self):
+        """Return an array of nodes' successors, 0 for depot."""
+        data = [0] * (self.task.N+1)
+        for route in self.r:
+            for a, b, _, _ in route[R_EDG][1:]:
+                data[a] = b
+        return data
+    
+    def get_signature(self):
+        """Return a hex digest of the solution."""
+        import hashlib
+        return hashlib.md5("-".join(str(succ) for succ in self.get_successors())).hexdigest()
         
     def infoline(self):
         return "(%d, %.2f) (%5.1f%%, %5.1f%%)" % (self.val()+self.percentage())
