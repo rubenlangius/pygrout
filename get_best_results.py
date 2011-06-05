@@ -22,6 +22,20 @@ solo = re.compile('''([RC]{1,2}[12]\d{2}\.?\d{0,3})\s*(\d+)\s*(\d+\.\d+)''', re.
 # download function
 get = lambda url: urllib2.urlopen(url).read()
 
+def save(match):
+    name, vehicles, distance = match.groups()
+    name = name.replace('_10', '10')
+    fname = 'vrptw/bestknown/%s.txt' % name
+    old_data = open(fname).read()
+    new_data = '%s %s\n' % (vehicles, distance)
+    summary = '%-7s %3s %s' % (name, vehicles, distance)
+    if old_data <> new_data:
+        open(fname, 'w').write(new_data)
+        print summary, 'CHANGED, from:', old_data
+    else:
+        print summary
+    return summary
+
 def sanitize(dta):
     """Prepare some bad HTML for easier regexp scanning."""
     dta = re.compile("<!--.*?-->", re.DOTALL).sub('', dta)
@@ -38,13 +52,9 @@ def get_hombergers_sintef():
         start = time.time()
         data = get(u)
         s, kb = time.time()-start, len(data)/1024.0
-        found =  homb.findall(data)
-        for name, vehicles, distance in found:
-            name = name.replace('_10', '10')
-            open('vrptw/bestknown/%s.txt' % name, 'w').write(
-                '%s %s\n' % (vehicles, distance))
-            summary.append('%-7s %3s %s' % (name, vehicles, distance))
-            print summary[-1]
+        found =  homb.finditer(data)
+        for m in found:
+            summary.append(save(m))
         print "Downloaded %.1f KB in %.1f s (%.1f KB/s)" % (kb, s, kb/s)
     open('vrptw/bestknown/summary_H.txt', 'w').write("\n".join(sorted(summary,
          key=lambda x: x.replace('_', '0')))) 
@@ -61,11 +71,7 @@ def get_solomons():
         data = sanitize(get(u))
         found =  solo.finditer(data)
         for m in found:
-            name, vehicles, distance = m.groups()
-            open('vrptw/bestknown/%s.txt' % name, 'w').write(
-                '%s %s\n' % (vehicles, distance))
-            summary.append('%-10s %3s %7s' % (name, vehicles, distance))
-            print summary[-1]
+            summary.append(save(m))
         s, kb = time.time()-start, len(data)/1024.0
         print "Downloaded %.1f KB in %.1f s (%.1f KB/s)" % (kb, s, kb/s)
     open('vrptw/bestknown/summary_S.txt', 'w').write("\n".join(sorted(summary,
