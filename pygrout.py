@@ -299,6 +299,13 @@ def build_first(sol):
     u.commit()
     sol.loghist()
 
+def build_by_savings(sol):
+    """Construct a new solution by savings heuristic."""
+    sol.reset()
+    for c in xrange(sol.task.N):
+        insert_new(c+1)
+    # TODO: now merge routes ;)
+
 def local_search(sol, oper, end=0, verb=False, speed=None):
     """Optimize solution by local search."""
     # local rebinds
@@ -635,6 +642,14 @@ def resume(args):
     print "Removed %d in %s, now: %s" % (tgt, sol.task.name, sol.infoline()), 
 
 @command
+def perturb(args):
+    """Load a solution and perform some search around."""
+    sol = load_solution(args.test)
+    local_search(sol, op_tabu_single)
+    print_like_Czarnas(sol)
+    sol.save('_pert')
+    
+@command
 def grout(args):
     """Postprocess a solution using the proprietary grout program."""
     import grout
@@ -697,6 +712,7 @@ def run_all(args):
 def load_solution(f):
     """Unpickle solution from a stream."""
     solution_data = cPickle.load(f)
+    print os.path.dirname(__file__), solution_data['filename']
     filename = os.path.join(os.path.dirname(__file__),
                             solution_data['filename'])
     print "Loading solution from:", filename

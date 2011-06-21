@@ -119,20 +119,24 @@ class VrptwSolution(object):
     """A routes (lists of customer IDs) collection, basically."""
     
     # default output directory for saved solutions
-    outdir = "output"
+    outdir = os.path.join(os.path.dirname(__file__), '..', "output")
         
     def __init__(self, task):
         """The task could be used to keep track of it."""
         self.task = task
-        self.r = []
-        self.dist = 0.
-        self.k = 0
+        self.reset()
         # additional field for any purpose
         self.mem = {}
         self.mem['r_seed'] = r_seed
         self.mem['t_start'] = time.time()
         self.history = []
 
+    def reset(self):
+        """Reinitialize the solution as empty."""
+        self.r = []
+        self.dist = 0.
+        self.k = 0
+        
     def loghist(self):
         """Put the current time and value into the history list."""
         self.history.append( [self.k, self.dist, time.time()-self.mem['t_start']] )
