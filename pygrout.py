@@ -290,20 +290,46 @@ def op_tabu_shortest(sol, randint = r.randint):
 
 def build_first(sol):
     """Greedily construct the first solution."""
-    sol.dist = 0
-    sol.k = 0
-    sol.r = []
+    sol.reset()
     for c in sol.task.getSortedCustomers():
         insert_customer(sol, c[ID])
     sol.mem['init_order'] = VrptwTask.sort_order
     u.commit()
     sol.loghist()
 
-def build_by_savings(sol):
+def build_by_savings(sol, wait_limit = None):
     """Construct a new solution by savings heuristic."""
+    
+    def check_saving(x, y):
+        """Compute and return possible saving for concatenating x and y."""
+        xk, _, arr_xk, _ = sol.r[x][R_EDG][-1]
+        _, y0, _, larr_y0 = sol.r[y][R_EDG][0]
+        arr_y0 = arr_xk + sol.t(xk, y0)
+        wait_y0 = max(0, sol.a(y0) - arr_y0)
+        if arr_y0 > larr_y0 or (wait_limit is not None and wait_y0 > wait_limit):
+            return None
+        return sol.d(xk, 0) + sol.d(0, y0) - sol.d(xk, y0)
+        
+    def list_savings():
+        savings = []
+        for i in xrange(sol.k):
+            for j in xrange(sol.k):
+                if i <> j:
+                    s = check_saving(i, j)
+                    if s is not None:
+                        savings.append((s, i, j))
+                
+        return savings
+        
     sol.reset()
     for c in xrange(sol.task.N):
-        insert_new(c+1)
+        insert_new(sol, c+1)
+    while True:
+        savings = list_savings()
+        if len(savings) == 0:
+            break
+        print savings
+        break
     # TODO: now merge routes ;)
 
 def local_search(sol, oper, end=0, verb=False, speed=None):
@@ -930,6 +956,7 @@ def initials(args):
     sol = VrptwSolution(VrptwTask(args.test))
     results = []
     best_order = None
+    build_by_savings(sol)
     for k in sort_keys.keys():
         VrptwTask.sort_order = k
         build_first(sol)
