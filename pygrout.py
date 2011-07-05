@@ -306,19 +306,19 @@ def build_by_savings(sol, wait_limit = None):
         _, y0, _, larr_y0 = sol.r[y][R_EDG][0]
         arr_y0 = arr_xk + sol.t(xk, y0)
         wait_y0 = max(0, sol.a(y0) - arr_y0)
-        if arr_y0 > larr_y0 or (wait_limit is not None and wait_y0 > wait_limit):
+        if arr_y0 > larr_y0 or (wait_limit and wait_y0 > wait_limit):
             return None
         return sol.d(xk, 0) + sol.d(0, y0) - sol.d(xk, y0)
         
     def list_savings():
+        """Return list of possible savings as [(saving, route 1, route 2)]."""
         savings = []
         for i in xrange(sol.k):
             for j in xrange(sol.k):
                 if i <> j:
                     s = check_saving(i, j)
                     if s is not None:
-                        savings.append((s, i, j))
-                
+                        savings.append((s, i, j))                
         return savings
         
     sol.reset()
@@ -328,8 +328,10 @@ def build_by_savings(sol, wait_limit = None):
         savings = list_savings()
         if len(savings) == 0:
             break
-        print savings
-        break
+        savings.sort()
+        print savings[-1], sol.d(*savings[-1][1:])
+        print sorted( (sol.d(i,j), i, j) for i in xrange(1, sol.task.N) for j in range(i+1, sol.task.N+1) ) [:10]
+        exit()
     # TODO: now merge routes ;)
 
 def local_search(sol, oper, end=0, verb=False, speed=None):
