@@ -13,143 +13,10 @@ import cPickle
 import numpy as np
 
 # additional modules
-from vrptw import VrptwTask, VrptwSolution, u, r, sort_keys, \
-                  propagate_arrival, propagate_deadline
-
+from vrptw import *
 from vrptw.consts import *
 from compat import *
         
-# THE MODEL - basic operations on a solution (through UndoStack
-
-def insert_new(sol, c):
-    """Inserts customer C on a new route."""
-    new_route = [
-        2,                # number of edges
-        sol.dem(c),       # demand on route 
-        sol.d(0,c)+sol.d(c,0), # distance there and back
-        [
-            [0, c,                         0, sol.b(c)], # depot -> c
-            [c, 0, max(sol.t(0,c), sol.a(c)), sol.b(0)]  # c -> depot
-        ]
-    ]
-    u.ins(sol.r, sol.k, new_route)
-    u.atr(sol, 'k', sol.k+1)                      # route no inc
-    u.atr(sol, 'dist', sol.dist+new_route[R_DIS]) # total distance inc
-
-def insert_at_pos(sol, c, r, pos):
-    """Inserts c into route ad pos. Does no checks."""
-    # update edges (with arival times)
-    edges = sol.r[r][R_EDG]
-    # old edge
-    a, b, arr_a, larr_b = u.pop(edges, pos)
-    # arrival and latest arrival time to middle
-    arr_c = max(arr_a + sol.t(a, c), sol.a(c))
-    larr_c = min(sol.b(c), larr_b-sol.t(c, b))
-    assert arr_c <= larr_c, 'invalid insertion, time window violated'
-    # new edges - second then first
-    u.ins(edges, pos, [c, b, arr_c, larr_b])
-    u.ins(edges, pos, [a, c, arr_a, larr_c])
-
-    # propagate time window constraints - forward
-    propagate_arrival(sol, r, pos+1)
-
-    # propagate time window constraints - backward
-    propagate_deadline(sol, r, pos)
-
-    # update distances
-    dinc = sol.d(a, c)+sol.d(c, b)-sol.d(a, b)
-    u.add(sol.r[r], R_DIS, dinc)
-    u.ada(sol, 'dist', dinc)
-    # update capacity
-    u.add(sol.r[r], R_CAP, sol.dem(c))
-    # update count
-    u.add(sol.r[r], R_LEN, 1)
-
-def find_bestpos_on(sol, c, r):
-    """Finds best position to insert customer on existing route."""
-    # check capacity
-    if sol.r[r][R_CAP] + sol.dem(c) > sol.task.capa:
-        return None, None
-    # pull out deep things locally
-    time = sol.task.time
-    cust = sol.task.cust
-    dist = sol.task.dist
-    c_a = cust[c][A]
-    c_b = cust[c][B]
-
-    def eval_edge(pack):
-        pos, (a, b, arr_a, larr_b) = pack
-        arr_c = max(arr_a + time[a][c], c_a) # earliest possible
-        larr_c = min(c_b, larr_b-time[c][b]) # latest if c WAS here
-        larr_a = min(sol.b(a), larr_c-time[a][c])
-        if  arr_c <= larr_c and arr_a <= larr_a:
-            return (-(dist[a][c] + dist[c][b] - dist[a][b]), pos)
-        return None, None
-        
-    # find the best edge 
-    return max(map(eval_edge, enumerate(sol.r[r][R_EDG])))
-
-def find_bestpos(sol, c):
-    """Find best positions on any route, return the route pos and distance.
-    The exact format is a nested tuple: ((-dist increase, position), route)"""
-    bdp = (None, None)
-    br = None
-    for i in xrange(sol.k):
-        for m in find_allpos_on(sol, c, i):
-            if m > bdp:
-                bdp = m
-                br = i
-    return (bdp, br)
-
-def insert_customer(sol, c):
-    """Insert customer at best position or new route."""
-    if sol.k == 0:
-        insert_new(sol, c)
-        return sol.k-1, 0
-    else:
-        # best distinc, best pos, best route
-        (bd, bp), br = find_bestpos(sol, c)
-        # found some route to insert
-        if not bd is None:
-            insert_at_pos(sol, c, br, bp)
-            return br, bp
-        else:
-            insert_new(sol, c)
-            return sol.k-1, 0
-
-def remove_customer(sol, r, pos):
-    """Remove customer at pos from a route and return his ID."""
-    assert pos < sol.r[r][R_LEN], 'removal past route end'
-    edges = sol.r[r][R_EDG]
-    a, b, arr_a, larr_b = u.pop(edges, pos)
-    d, c, arr_b, larr_c = u.pop(edges, pos)
-    assert b == d, 'adjacent edges do not meet in one node'
-    
-    if sol.r[r][R_LEN] == 2: # last customer - remove route
-        rt = u.pop(sol.r, r)
-        # solution route count decrease
-        u.ada(sol, 'k', -1)
-        # solution distance decrease
-        u.ada(sol, 'dist', -rt[R_DIS])
-        return b
-
-    assert arr_a + sol.t(a, c) < larr_c, 'time window error after removal'
-    u.ins(edges, pos, [a, c, arr_a, larr_c])
-
-    # propagating time window constraints
-    propagate_arrival(sol, r, pos)
-    propagate_deadline(sol, r, pos)
-
-    # update distances (probably decrease)
-    dinc = sol.d(a, c)-sol.d(a, b)-sol.d(b, c)
-    u.add(sol.r[r], R_DIS, dinc)
-    u.ada(sol, 'dist', dinc)
-    # update capacity
-    u.add(sol.r[r], R_CAP, -sol.dem(b))
-    # update count
-    u.add(sol.r[r], R_LEN, -1)
-    return b
-
 # NEIGBOURHOOD OPERATORS - single step trials
     
 operations = dict()
@@ -187,38 +54,7 @@ def pick_long_route(sol, random=r.random):
     """Return a random route, with preference for the longer."""
     lengths = np.array([rt[R_LEN]-1 for rt in sol.r]).cumsum()
     return bisect_left(lengths, random()*lengths[-1])
-
-def find_allpos_on(sol, c, r, startpos=0):
-    """Find all positions where customer c can be inserted on route r
-    and return them as tuples (distinc, position)."""
-    # check capacity
-    if sol.r[r][R_CAP] + sol.dem(c) > sol.task.capa:
-        return
-    # check route edges
-    edges = sol.r[r][R_EDG]
-    time = sol.task.time
-    cust = sol.task.cust
-    dist = sol.task.dist
-    c_a = cust[c][A]
-    c_b = cust[c][B]
-    for pos in xrange(startpos, sol.r[r][R_LEN]):
-        a, b, arr_a, larr_b = edges[pos]
-        if c_a > larr_b:
-            # too early
-            continue
-        if arr_a > c_b:
-            # too late
-            break
-        arr_c  = max(arr_a + time[a][c], c_a) # earliest possible
-        larr_c = min(c_b, larr_b-time[c][b]) # latest if c WAS here
-        larr_a = min(cust[a][B], larr_c-time[a][c])
-        if  arr_c <= larr_c and not arr_a <= larr_a:
-            print "yes, this ever happens..."
-        if  arr_c <= larr_c and arr_a <= larr_a:
-            # for some cases distinc in optional...
-            distinc = -(dist[a][c] + dist[c][b] - dist[a][b])
-            yield (distinc, pos)
-                
+             
 @operation
 def op_fight_shortest(sol, random=r.random, randint=r.randint):
     """Picks and tries to empty a random route with preference for shortest."""
@@ -328,10 +164,11 @@ def build_by_savings(sol, wait_limit = None):
         savings = list_savings()
         if len(savings) == 0:
             break
-        savings.sort()
-        print savings[-1], sol.d(*savings[-1][1:])
-        print sorted( (sol.d(i,j), i, j) for i in xrange(1, sol.task.N) for j in range(i+1, sol.task.N+1) ) [:10]
-        exit()
+        sav, r1, r2 = max(savings)
+        print 'saving', sav, 'by join of', r1, r2
+        join_routes(sol, r1, r2)
+        sol.check()
+        
     # TODO: now merge routes ;)
 
 def local_search(sol, oper, end=0, verb=False, speed=None):
