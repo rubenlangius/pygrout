@@ -168,8 +168,7 @@ def build_by_savings(sol, wait_limit = None):
         print 'saving', sav, 'by join of', r1, r2
         join_routes(sol, r1, r2)
         sol.check()
-        
-    # TODO: now merge routes ;)
+
 
 def local_search(sol, oper, end=0, verb=False, speed=None):
     """Optimize solution by local search."""
