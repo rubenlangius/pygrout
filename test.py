@@ -1,4 +1,5 @@
 #!/usr/bin/env python   
+from numpy.linalg.tests import test_build
 
 # may perhaps even work on systems without numpy
 try:
@@ -6,6 +7,32 @@ try:
 except: 
     numpy = type('dummy', (object,), dict(float64=float))()
 
+from vrptw import VrptwTask
+
+class DummyTask(VrptwTask):
+    def __init__(self, cust = [
+            [0, 0, 0, 0, 0, 20, 0],
+            [1, 1, 1, 20, 1, 5, 1],
+            [2, 2, 2, 10, 0, 8, 1],
+            [3, 1, 2, 15, 4, 15, 1],
+            [4, 0, 1, 5, 10, 18, 1]
+                               ], Kmax = 10, capa = 200):
+        self.name = 'test'
+        self.cust = cust
+        self.Kmax = Kmax
+        self.capa = capa
+        self.N = len(self.cust)-1
+        self.precompute()
+        self.best_k, self.best_dist = None, None
+
+def test_savings():
+    """Check the savings (Clarke, Wright) construction method."""
+    from vrptw import VrptwSolution
+    sol = VrptwSolution(DummyTask())   
+    from pygrout import build_by_savings
+    build_by_savings(sol)
+    assert sol.check()
+     
 def test_deepmap():
     """Check the utility for mapping nested lists and dictionaries."""
     from organize import deepmap
@@ -88,4 +115,4 @@ def _test_initial_creation():
         yield check_one, test
 
 if __name__ == '__main__':
-    test_find_pos()
+    test_savings()
