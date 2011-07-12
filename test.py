@@ -1,5 +1,4 @@
 #!/usr/bin/env python   
-from numpy.linalg.tests import test_build
 
 # may perhaps even work on systems without numpy
 try:

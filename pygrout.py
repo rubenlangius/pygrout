@@ -133,18 +133,20 @@ def build_first(sol):
     u.commit()
     sol.loghist()
 
-def build_by_savings(sol, wait_limit = None):
+def build_by_savings(sol, wait_limit = None, mi = 1):
     """Construct a new solution by savings heuristic."""
     
     def check_saving(x, y):
-        """Compute and return possible saving for concatenating x and y."""
+        """Compute and return possible saving for concatenating x and y.
+        
+        The return value is a tuple (saving, wait_time)"""
         xk, _, arr_xk, _ = sol.r[x][R_EDG][-1]
         _, y0, _, larr_y0 = sol.r[y][R_EDG][0]
         arr_y0 = arr_xk + sol.t(xk, y0)
         wait_y0 = max(0, sol.a(y0) - arr_y0)
         if arr_y0 > larr_y0 or (wait_limit and wait_y0 > wait_limit):
-            return None
-        return sol.d(xk, 0) + sol.d(0, y0) - sol.d(xk, y0)
+            return None, None
+        return sol.d(xk, 0) + sol.d(0, y0) - mi*sol.d(xk, y0), wait_y0
         
     def list_savings():
         """Return list of possible savings as [(saving, route 1, route 2)]."""
@@ -152,9 +154,9 @@ def build_by_savings(sol, wait_limit = None):
         for i in xrange(sol.k):
             for j in xrange(sol.k):
                 if i <> j:
-                    s = check_saving(i, j)
+                    s, w = check_saving(i, j)
                     if s is not None:
-                        savings.append((s, i, j))                
+                        savings.append((s, -w, i, j))                
         return savings
         
     sol.reset()
@@ -164,11 +166,12 @@ def build_by_savings(sol, wait_limit = None):
         savings = list_savings()
         if len(savings) == 0:
             break
-        sav, r1, r2 = max(savings)
-        print 'saving', sav, 'by join of', r1, r2
+        sav, wt, r1, r2 = max(savings)
+        print 'saving', sav, 'by join of', r1, r2, 'wait', wt
         join_routes(sol, r1, r2)
         sol.check()
-
+    u.commit()
+    return sol
 
 def local_search(sol, oper, end=0, verb=False, speed=None):
     """Optimize solution by local search."""
