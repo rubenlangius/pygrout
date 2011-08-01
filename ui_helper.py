@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'helper.ui'
 #
-# Created: Fri Jul 29 00:03:43 2011
+# Created: Tue Aug  2 00:10:14 2011
 #      by: PyQt4 UI code generator 4.8.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -53,6 +53,9 @@ class Ui_Helper(object):
         self.waitlimit.setSingleStep(30)
         self.waitlimit.setObjectName(_fromUtf8("waitlimit"))
         self.horizontalLayout.addWidget(self.waitlimit)
+        self.update = QtGui.QPushButton(self.groupBox)
+        self.update.setObjectName(_fromUtf8("update"))
+        self.horizontalLayout.addWidget(self.update)
         self.horizontalLayout_2.addWidget(self.groupBox)
         self.groupBox_2 = QtGui.QGroupBox(self.widget)
         self.groupBox_2.setObjectName(_fromUtf8("groupBox_2"))
@@ -76,9 +79,6 @@ class Ui_Helper(object):
         self.horizontalLayout_3.addWidget(self.label_3)
         self.horizontalLayout_2.addWidget(self.groupBox_2)
         self.verticalLayout.addWidget(self.widget)
-        self.update = QtGui.QPushButton(Helper)
-        self.update.setObjectName(_fromUtf8("update"))
-        self.verticalLayout.addWidget(self.update)
 
         self.retranslateUi(Helper)
         QtCore.QObject.connect(self.has_waitlimit, QtCore.SIGNAL(_fromUtf8("toggled(bool)")), self.waitlimit.setEnabled)
@@ -86,9 +86,10 @@ class Ui_Helper(object):
 
     def retranslateUi(self, Helper):
         Helper.setWindowTitle(QtGui.QApplication.translate("Helper", "Route construction testing", None, QtGui.QApplication.UnicodeUTF8))
-        self.groupBox.setTitle(QtGui.QApplication.translate("Helper", "Savings heuristic options", None, QtGui.QApplication.UnicodeUTF8))
+        self.groupBox.setTitle(QtGui.QApplication.translate("Helper", "Savings heuristic", None, QtGui.QApplication.UnicodeUTF8))
         self.label.setText(QtGui.QApplication.translate("Helper", "µ param", None, QtGui.QApplication.UnicodeUTF8))
         self.has_waitlimit.setText(QtGui.QApplication.translate("Helper", "use waitlimit", None, QtGui.QApplication.UnicodeUTF8))
+        self.update.setText(QtGui.QApplication.translate("Helper", "Plot", None, QtGui.QApplication.UnicodeUTF8))
         self.groupBox_2.setTitle(QtGui.QApplication.translate("Helper", "Test group selection", None, QtGui.QApplication.UnicodeUTF8))
         self.label_2.setText(QtGui.QApplication.translate("Helper", "C / R / RC", None, QtGui.QApplication.UnicodeUTF8))
         __sortingEnabled = self.families.isSortingEnabled()
@@ -98,5 +99,4 @@ class Ui_Helper(object):
         self.families.item(2).setText(QtGui.QApplication.translate("Helper", "RC", None, QtGui.QApplication.UnicodeUTF8))
         self.families.setSortingEnabled(__sortingEnabled)
         self.label_3.setText(QtGui.QApplication.translate("Helper", "to be done...", None, QtGui.QApplication.UnicodeUTF8))
-        self.update.setText(QtGui.QApplication.translate("Helper", "Update results", None, QtGui.QApplication.UnicodeUTF8))
 
