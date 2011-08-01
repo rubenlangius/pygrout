@@ -32,7 +32,7 @@
       <item>
        <widget class="QGroupBox" name="groupBox">
         <property name="title">
-         <string>Savings heuristic options</string>
+         <string>Savings heuristic</string>
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout">
          <item>
@@ -72,6 +72,13 @@
            </property>
            <property name="singleStep">
             <number>30</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="update">
+           <property name="text">
+            <string>Plot</string>
            </property>
           </widget>
          </item>
@@ -138,13 +145,6 @@
      </layout>
     </widget>
    </item>
-   <item>
-    <widget class="QPushButton" name="update">
-     <property name="text">
-      <string>Update results</string>
-     </property>
-    </widget>
-   </item>
   </layout>
  </widget>
  <resources/>
@@ -156,12 +156,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>163</x>
-     <y>327</y>
+     <x>218</x>
+     <y>371</y>
     </hint>
     <hint type="destinationlabel">
-     <x>110</x>
-     <y>327</y>
+     <x>274</x>
+     <y>372</y>
     </hint>
    </hints>
   </connection>

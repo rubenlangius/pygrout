@@ -37,9 +37,6 @@ class Helper(QtGui.QDialog):
         self.ui.verticalLayout.addWidget(self.canvas)
         # custom slots
         QtCore.QObject.connect(self.ui.update, QtCore.SIGNAL("clicked()"), self.redraw)
-        # extra vars
-        self.lastmi = None
-        self.lastwait = None
 #        self.fileSystemModel = QtGui.QFileSystemModel()
 #        self.fileSystemModel.setRootPath('.')
 #        self.ui.treeView.setModel(self.fileSystemModel)

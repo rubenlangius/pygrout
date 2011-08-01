@@ -144,7 +144,9 @@ def build_by_savings(sol, wait_limit = None, mi = 1):
         _, y0, _, larr_y0 = sol.r[y][R_EDG][0]
         arr_y0 = arr_xk + sol.t(xk, y0)
         wait_y0 = max(0, sol.a(y0) - arr_y0)
-        if arr_y0 > larr_y0 or (wait_limit and wait_y0 > wait_limit):
+        if (sol.r[x][R_CAP]+sol.r[y][R_CAP] > sol.task.capa
+            or arr_y0 > larr_y0 
+            or (wait_limit and wait_y0 > wait_limit) ):
             return None, None
         return sol.d(xk, 0) + sol.d(0, y0) - mi*sol.d(xk, y0), wait_y0
         
