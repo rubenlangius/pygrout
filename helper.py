@@ -13,6 +13,14 @@ from matplotlib.figure import Figure
 from PyQt4 import QtCore, QtGui
 from ui_helper import Ui_Helper
 
+def get_value(name, waitlimit, mi):
+    from pygrout import VrptwSolution, VrptwTask, build_by_savings    
+    print "Should process", name
+    sol = VrptwSolution(VrptwTask(open(name)))
+    build_by_savings(sol, waitlimit, mi)
+    return sol.val()
+
+        
 class Helper(QtGui.QDialog):
     def __init__(self, parent=None):
         # boilerplate
@@ -21,9 +29,10 @@ class Helper(QtGui.QDialog):
         self.ui.setupUi(self)
         # add custom mpl canvas
         self.fig = Figure(figsize=(600,600), dpi=72, facecolor=(1,1,1), edgecolor=(0,0,0))
-        self.ax = self.fig.add_subplot(111)
+        self.ax_k = self.fig.add_subplot(211)
+        self.ax_d = self.fig.add_subplot(212)
         # plot something initially:
-        self.ax.plot([0,1])
+        # self.ax.plot([0,1])
         self.canvas = FigureCanvas(self.fig)
         self.ui.verticalLayout.addWidget(self.canvas)
         # custom slots
@@ -39,11 +48,17 @@ class Helper(QtGui.QDialog):
 
     def redraw(self):
         from glob import glob
-        from pygrout import *
+        mi = self.ui.mi.value()
+        waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
         print dir()
-        for name in glob('solomons/*.txt'):
-            print "Should process", name
-        print "Not yet ready"
+        # from multiprocessing import Pool
+        # p = Pool()
+        data = map(lambda x: get_value(x, waitlimit, mi), sorted(glob('solomons/*.txt')))
+        print data
+        self.ax_k.plot([x[0] for x in data])
+        self.ax_d.plot([x[1] for x in data])
+        print "What now?"
+        self.fig.canvas.draw()
     
     def accept(self):
 #        for idx in self.ui.treeView.selectedIndexes():
