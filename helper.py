@@ -20,6 +20,9 @@ def get_value(name, waitlimit, mi):
     build_by_savings(sol, waitlimit, mi)
     return sol.val()
 
+class Worker(QtCore.QThread):
+    pass
+
         
 class Helper(QtGui.QDialog):
     def __init__(self, parent=None):
@@ -45,6 +48,8 @@ class Helper(QtGui.QDialog):
 
     def redraw(self):
         from glob import glob
+        from stopwatch import StopWatch
+        watch = StopWatch()
         mi = self.ui.mi.value()
         waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
         print dir()
@@ -54,7 +59,7 @@ class Helper(QtGui.QDialog):
         print data
         self.ax_k.plot([x[0] for x in data])
         self.ax_d.plot([x[1] for x in data])
-        print "What now?"
+        print "What now?", watch
         self.fig.canvas.draw()
     
     def accept(self):
