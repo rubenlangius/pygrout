@@ -47,13 +47,9 @@ class Helper(QtGui.QDialog):
         self.worker = Worker(self)
         # custom slots
         QtCore.QObject.connect(self.ui.update, QtCore.SIGNAL("clicked()"), self.plot_savings)
+        QtCore.QObject.connect(self.ui.best, QtCore.SIGNAL("clicked()"), self.plot_best)
         QtCore.QObject.connect(self.worker, QtCore.SIGNAL("finished()"), self.background_done)
         QtCore.QObject.connect(self.worker, QtCore.SIGNAL("terminated()"), self.background_done)
-#        self.fileSystemModel = QtGui.QFileSystemModel()
-#        self.fileSystemModel.setRootPath('.')
-#        self.ui.treeView.setModel(self.fileSystemModel)
-#        self.ui.treeView.setRootIndex(self.fileSystemModel.index('./output'))
-#        self.target = None
 
     def background_done(self):
         self.ui.update.setEnabled(True)
@@ -63,7 +59,6 @@ class Helper(QtGui.QDialog):
         self.worker.start()
         
     def redraw(self):
-        from glob import glob
         from stopwatch import StopWatch
         watch = StopWatch()
         mi = self.ui.mi.value()
@@ -71,20 +66,23 @@ class Helper(QtGui.QDialog):
         from multiprocessing import Pool
         from itertools import repeat
         p = Pool()
-        data = p.map(get_value, zip(sorted(glob('solomons/r1*.txt')), repeat(waitlimit), repeat(mi)))
+        data = p.map(get_value, zip(self.tests_chosen(), repeat(waitlimit), repeat(mi)))
         print data
         self.ax_k.plot([x[0] for x in data])
         self.ax_d.plot([x[1] for x in data])
         print "What now?", watch
         self.fig.canvas.draw()
-        
+
+    def tests_chosen(self):
+        """Return a sorted list of filenames by pattern in the families list."""
+        from glob import glob
+        pattern = str(self.ui.families.currentItem().text())
+        return sorted(glob(pattern))
+                
+    def plot_best(self):
+        print self.tests_chosen()
     
     def accept(self):
-#        for idx in self.ui.treeView.selectedIndexes():
-#            print idx
-#            print self.fileSystemModel.filePath(idx)
-#            print self.fileSystemModel.fileName(idx)
-#            print '-'*10
         QtGui.QDialog.accept(self)
         
     def reject(self):

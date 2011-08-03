@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'helper.ui'
 #
-# Created: Tue Aug  2 00:10:14 2011
+# Created: Thu Aug  4 01:03:57 2011
 #      by: PyQt4 UI code generator 4.8.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -61,26 +61,22 @@ class Ui_Helper(object):
         self.groupBox_2.setObjectName(_fromUtf8("groupBox_2"))
         self.horizontalLayout_3 = QtGui.QHBoxLayout(self.groupBox_2)
         self.horizontalLayout_3.setObjectName(_fromUtf8("horizontalLayout_3"))
-        self.label_2 = QtGui.QLabel(self.groupBox_2)
-        self.label_2.setObjectName(_fromUtf8("label_2"))
-        self.horizontalLayout_3.addWidget(self.label_2)
         self.families = QtGui.QListWidget(self.groupBox_2)
         self.families.setMinimumSize(QtCore.QSize(30, 80))
         self.families.setObjectName(_fromUtf8("families"))
-        item = QtGui.QListWidgetItem(self.families)
-        item.setCheckState(QtCore.Qt.Checked)
-        item = QtGui.QListWidgetItem(self.families)
-        item.setCheckState(QtCore.Qt.Checked)
-        item = QtGui.QListWidgetItem(self.families)
-        item.setCheckState(QtCore.Qt.Checked)
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
         self.horizontalLayout_3.addWidget(self.families)
-        self.label_3 = QtGui.QLabel(self.groupBox_2)
-        self.label_3.setObjectName(_fromUtf8("label_3"))
-        self.horizontalLayout_3.addWidget(self.label_3)
+        self.best = QtGui.QPushButton(self.groupBox_2)
+        self.best.setObjectName(_fromUtf8("best"))
+        self.horizontalLayout_3.addWidget(self.best)
         self.horizontalLayout_2.addWidget(self.groupBox_2)
         self.verticalLayout.addWidget(self.widget)
 
         self.retranslateUi(Helper)
+        self.families.setCurrentRow(0)
         QtCore.QObject.connect(self.has_waitlimit, QtCore.SIGNAL(_fromUtf8("toggled(bool)")), self.waitlimit.setEnabled)
         QtCore.QMetaObject.connectSlotsByName(Helper)
 
@@ -91,12 +87,12 @@ class Ui_Helper(object):
         self.has_waitlimit.setText(QtGui.QApplication.translate("Helper", "use waitlimit", None, QtGui.QApplication.UnicodeUTF8))
         self.update.setText(QtGui.QApplication.translate("Helper", "Plot", None, QtGui.QApplication.UnicodeUTF8))
         self.groupBox_2.setTitle(QtGui.QApplication.translate("Helper", "Test group selection", None, QtGui.QApplication.UnicodeUTF8))
-        self.label_2.setText(QtGui.QApplication.translate("Helper", "C / R / RC", None, QtGui.QApplication.UnicodeUTF8))
         __sortingEnabled = self.families.isSortingEnabled()
         self.families.setSortingEnabled(False)
-        self.families.item(0).setText(QtGui.QApplication.translate("Helper", "C", None, QtGui.QApplication.UnicodeUTF8))
-        self.families.item(1).setText(QtGui.QApplication.translate("Helper", "R", None, QtGui.QApplication.UnicodeUTF8))
-        self.families.item(2).setText(QtGui.QApplication.translate("Helper", "RC", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(0).setText(QtGui.QApplication.translate("Helper", "solomons/*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(1).setText(QtGui.QApplication.translate("Helper", "solomons/c*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(2).setText(QtGui.QApplication.translate("Helper", "solomons/r[12]*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(3).setText(QtGui.QApplication.translate("Helper", "solomons/rc*.txt", None, QtGui.QApplication.UnicodeUTF8))
         self.families.setSortingEnabled(__sortingEnabled)
-        self.label_3.setText(QtGui.QApplication.translate("Helper", "to be done...", None, QtGui.QApplication.UnicodeUTF8))
+        self.best.setText(QtGui.QApplication.translate("Helper", "Plot best", None, QtGui.QApplication.UnicodeUTF8))
 
