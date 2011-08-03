@@ -21,7 +21,13 @@ def get_value(name, waitlimit, mi):
     return sol.val()
 
 class Worker(QtCore.QThread):
-    pass
+    def __init__(self, helper, parent = None):
+        super(Worker, self).__init__(parent)
+        self.helper = helper
+        
+    def run(self):
+        self.helper.redraw()
+        
 
         
 class Helper(QtGui.QDialog):
@@ -34,18 +40,28 @@ class Helper(QtGui.QDialog):
         self.fig = Figure(figsize=(600,600), dpi=72, facecolor=(1,1,1), edgecolor=(0,0,0))
         self.ax_k = self.fig.add_subplot(211)
         self.ax_d = self.fig.add_subplot(212)
-        # plot something initially:
-        # self.ax.plot([0,1])
+        # the canvas:
         self.canvas = FigureCanvas(self.fig)
         self.ui.verticalLayout.addWidget(self.canvas)
+        # the worker thread (one, for now)
+        self.worker = Worker(self)
         # custom slots
-        QtCore.QObject.connect(self.ui.update, QtCore.SIGNAL("clicked()"), self.redraw)
+        QtCore.QObject.connect(self.ui.update, QtCore.SIGNAL("clicked()"), self.plot_savings)
+        QtCore.QObject.connect(self.worker, QtCore.SIGNAL("finished()"), self.background_done)
+        QtCore.QObject.connect(self.worker, QtCore.SIGNAL("terminated()"), self.background_done)
 #        self.fileSystemModel = QtGui.QFileSystemModel()
 #        self.fileSystemModel.setRootPath('.')
 #        self.ui.treeView.setModel(self.fileSystemModel)
 #        self.ui.treeView.setRootIndex(self.fileSystemModel.index('./output'))
 #        self.target = None
 
+    def background_done(self):
+        self.ui.update.setEnabled(True)
+        
+    def plot_savings(self):
+        self.ui.update.setEnabled(False)
+        self.worker.start()
+        
     def redraw(self):
         from glob import glob
         from stopwatch import StopWatch
@@ -55,12 +71,13 @@ class Helper(QtGui.QDialog):
         print dir()
         # from multiprocessing import Pool
         # p = Pool()
-        data = map(lambda x: get_value(x, waitlimit, mi), sorted(glob('solomons/*.txt')))
+        data = map(lambda x: get_value(x, waitlimit, mi), sorted(glob('solomons/r1*.txt')))
         print data
         self.ax_k.plot([x[0] for x in data])
         self.ax_d.plot([x[1] for x in data])
         print "What now?", watch
         self.fig.canvas.draw()
+        
     
     def accept(self):
 #        for idx in self.ui.treeView.selectedIndexes():
