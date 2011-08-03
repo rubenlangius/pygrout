@@ -92,13 +92,6 @@
         </property>
         <layout class="QHBoxLayout" name="horizontalLayout_3">
          <item>
-          <widget class="QLabel" name="label_2">
-           <property name="text">
-            <string>C / R / RC</string>
-           </property>
-          </widget>
-         </item>
-         <item>
           <widget class="QListWidget" name="families">
            <property name="minimumSize">
             <size>
@@ -106,36 +99,35 @@
              <height>80</height>
             </size>
            </property>
+           <property name="currentRow">
+            <number>0</number>
+           </property>
            <item>
             <property name="text">
-             <string>C</string>
-            </property>
-            <property name="checkState">
-             <enum>Checked</enum>
+             <string>solomons/*.txt</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>R</string>
-            </property>
-            <property name="checkState">
-             <enum>Checked</enum>
+             <string>solomons/c*.txt</string>
             </property>
            </item>
            <item>
             <property name="text">
-             <string>RC</string>
+             <string>solomons/r[12]*.txt</string>
             </property>
-            <property name="checkState">
-             <enum>Checked</enum>
+           </item>
+           <item>
+            <property name="text">
+             <string>solomons/rc*.txt</string>
             </property>
            </item>
           </widget>
          </item>
          <item>
-          <widget class="QLabel" name="label_3">
+          <widget class="QPushButton" name="best">
            <property name="text">
-            <string>to be done...</string>
+            <string>Plot best</string>
            </property>
           </widget>
          </item>
