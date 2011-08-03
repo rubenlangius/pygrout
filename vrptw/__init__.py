@@ -526,8 +526,8 @@ def find_allpos_on(sol, c, r, startpos=0):
 
 def join_routes(sol, r1, r2):
     """Append r2 to the end of r1. Currently irreversible."""
-    print sol.r[r1][R_EDG]
-    print sol.r[r2][R_EDG]
+    # print sol.r[r1][R_EDG]
+    # print sol.r[r2][R_EDG]
     c, _, arr_c, _ = sol.r[r1][R_EDG].pop()
     _, d, _, larr_d = sol.r[r2][R_EDG].pop(0)
     pos = sol.r[r1][R_LEN]-1
@@ -537,7 +537,7 @@ def join_routes(sol, r1, r2):
     sol.r[r1][R_CAP] += sol.r[r2][R_CAP]
     propagate_arrival(sol, r1, pos)
     propagate_deadline(sol, r1, pos)
-    print sol.r[r1][R_EDG]
+    # print sol.r[r1][R_EDG]
     sol.r.pop(r2)
     sol.k -= 1
-    
+
