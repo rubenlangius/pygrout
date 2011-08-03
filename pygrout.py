@@ -169,7 +169,7 @@ def build_by_savings(sol, wait_limit = None, mi = 1):
         if len(savings) == 0:
             break
         sav, wt, r1, r2 = max(savings)
-        print 'saving', sav, 'by join of', r1, r2, 'wait', wt
+        print 'saving', sav, 'by join of', r1, r2, 'wait', wt, 'in', sol.task.name
         join_routes(sol, r1, r2)
         sol.check()
     u.commit()

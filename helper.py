@@ -13,7 +13,9 @@ from matplotlib.figure import Figure
 from PyQt4 import QtCore, QtGui
 from ui_helper import Ui_Helper
 
-def get_value(name, waitlimit, mi):
+def get_value(task):
+    """The mapping function for savings heuristic."""
+    name, waitlimit, mi = task
     from pygrout import VrptwSolution, VrptwTask, build_by_savings    
     print "Should process", name
     sol = VrptwSolution(VrptwTask(open(name)))
@@ -27,8 +29,6 @@ class Worker(QtCore.QThread):
         
     def run(self):
         self.helper.redraw()
-        
-
         
 class Helper(QtGui.QDialog):
     def __init__(self, parent=None):
@@ -68,10 +68,10 @@ class Helper(QtGui.QDialog):
         watch = StopWatch()
         mi = self.ui.mi.value()
         waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
-        print dir()
-        # from multiprocessing import Pool
-        # p = Pool()
-        data = map(lambda x: get_value(x, waitlimit, mi), sorted(glob('solomons/r1*.txt')))
+        from multiprocessing import Pool
+        from itertools import repeat
+        p = Pool()
+        data = p.map(get_value, zip(sorted(glob('solomons/r1*.txt')), repeat(waitlimit), repeat(mi)))
         print data
         self.ax_k.plot([x[0] for x in data])
         self.ax_d.plot([x[1] for x in data])
