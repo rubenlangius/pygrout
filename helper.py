@@ -13,7 +13,7 @@ from matplotlib.figure import Figure
 from PyQt4 import QtCore, QtGui
 from ui_helper import Ui_Helper
 
-def get_value(task):
+def savings_val(task):
     """The mapping function for savings heuristic."""
     name, waitlimit, mi = task
     from pygrout import VrptwSolution, VrptwTask, build_by_savings    
@@ -50,13 +50,23 @@ class Helper(QtGui.QDialog):
         QtCore.QObject.connect(self.ui.best, QtCore.SIGNAL("clicked()"), self.plot_best)
         QtCore.QObject.connect(self.worker, QtCore.SIGNAL("finished()"), self.background_done)
         QtCore.QObject.connect(self.worker, QtCore.SIGNAL("terminated()"), self.background_done)
+        QtCore.QObject.connect(self, QtCore.SIGNAL("progress(int)"), self.update_progress)
 
     def background_done(self):
         self.ui.update.setEnabled(True)
+        self.ui.progressBar.setEnabled(False)
         
     def plot_savings(self):
         self.ui.update.setEnabled(False)
+        self.ui.progressBar.setEnabled(True)
+        self.ui.progressBar.setMaximum(len(self.tests_chosen()))
+        self.ui.progressBar.setValue(0)
         self.worker.start()
+        
+    def update_progress(self, progress):
+        """The slot for updating progress in event thread."""
+        print "--- one done ---"
+        self.ui.progressBar.setValue(progress)
         
     def redraw(self):
         from stopwatch import StopWatch
@@ -66,10 +76,16 @@ class Helper(QtGui.QDialog):
         from multiprocessing import Pool
         from itertools import repeat
         p = Pool()
-        data = p.map(get_value, zip(self.tests_chosen(), repeat(waitlimit), repeat(mi)))
+        tasks = zip(self.tests_chosen(), repeat(waitlimit), repeat(mi))
+        numDone = 0
+        data = []
+        for result in p.imap(savings_val, tasks):
+            data.append(result)
+            numDone += 1
+            self.emit(QtCore.SIGNAL('progress(int)'), numDone)
         print data
-        self.ax_k.plot([x[0] for x in data])
-        self.ax_d.plot([x[1] for x in data])
+        self.ax_k.plot([x[0] for x in data], '.')
+        self.ax_d.plot([x[1] for x in data], '.')
         print "What now?", watch
         self.fig.canvas.draw()
 

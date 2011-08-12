@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'helper.ui'
 #
-# Created: Thu Aug  4 01:03:57 2011
+# Created: Fri Aug 12 13:37:10 2011
 #      by: PyQt4 UI code generator 4.8.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -74,6 +74,11 @@ class Ui_Helper(object):
         self.horizontalLayout_3.addWidget(self.best)
         self.horizontalLayout_2.addWidget(self.groupBox_2)
         self.verticalLayout.addWidget(self.widget)
+        self.progressBar = QtGui.QProgressBar(Helper)
+        self.progressBar.setMaximum(100)
+        self.progressBar.setProperty(_fromUtf8("value"), 0)
+        self.progressBar.setObjectName(_fromUtf8("progressBar"))
+        self.verticalLayout.addWidget(self.progressBar)
 
         self.retranslateUi(Helper)
         self.families.setCurrentRow(0)
