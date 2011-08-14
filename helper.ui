@@ -30,62 +30,6 @@
      </property>
      <layout class="QHBoxLayout" name="horizontalLayout_2">
       <item>
-       <widget class="QGroupBox" name="groupBox">
-        <property name="title">
-         <string>Savings heuristic</string>
-        </property>
-        <layout class="QHBoxLayout" name="horizontalLayout">
-         <item>
-          <widget class="QLabel" name="label">
-           <property name="text">
-            <string>µ param</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QDoubleSpinBox" name="mi">
-           <property name="decimals">
-            <number>2</number>
-           </property>
-           <property name="singleStep">
-            <double>0.050000000000000</double>
-           </property>
-           <property name="value">
-            <double>1.000000000000000</double>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QCheckBox" name="has_waitlimit">
-           <property name="text">
-            <string>use waitlimit</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QSpinBox" name="waitlimit">
-           <property name="enabled">
-            <bool>false</bool>
-           </property>
-           <property name="maximum">
-            <number>120</number>
-           </property>
-           <property name="singleStep">
-            <number>30</number>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="update">
-           <property name="text">
-            <string>Plot</string>
-           </property>
-          </widget>
-         </item>
-        </layout>
-       </widget>
-      </item>
-      <item>
        <widget class="QGroupBox" name="groupBox_2">
         <property name="title">
          <string>Test group selection</string>
@@ -100,7 +44,7 @@
             </size>
            </property>
            <property name="currentRow">
-            <number>0</number>
+            <number>-1</number>
            </property>
            <item>
             <property name="text">
@@ -122,6 +66,36 @@
              <string>solomons/rc*.txt</string>
             </property>
            </item>
+           <item>
+            <property name="text">
+             <string>solomons/c1*.txt</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>solomons/c2*.txt</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>solomons/r1*.txt</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>solomons/r2*.txt</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>solomons/rc1*.txt</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>solomons/rc2*.txt</string>
+            </property>
+           </item>
           </widget>
          </item>
          <item>
@@ -129,6 +103,96 @@
            <property name="text">
             <string>Plot best</string>
            </property>
+          </widget>
+         </item>
+        </layout>
+       </widget>
+      </item>
+      <item>
+       <widget class="QGroupBox" name="groupBox_4">
+        <property name="title">
+         <string>Construction heuristic</string>
+        </property>
+        <layout class="QVBoxLayout" name="verticalLayout_2">
+         <item>
+          <widget class="QGroupBox" name="groupBox">
+           <property name="title">
+            <string>Savings heuristic</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout">
+            <item>
+             <widget class="QLabel" name="label">
+              <property name="text">
+               <string>µ param</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QDoubleSpinBox" name="mi">
+              <property name="decimals">
+               <number>2</number>
+              </property>
+              <property name="singleStep">
+               <double>0.050000000000000</double>
+              </property>
+              <property name="value">
+               <double>1.000000000000000</double>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QCheckBox" name="has_waitlimit">
+              <property name="text">
+               <string>use waitlimit</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="waitlimit">
+              <property name="enabled">
+               <bool>false</bool>
+              </property>
+              <property name="maximum">
+               <number>120</number>
+              </property>
+              <property name="singleStep">
+               <number>30</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="update">
+              <property name="text">
+               <string>Plot</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
+         <item>
+          <widget class="QGroupBox" name="groupBox_3">
+           <property name="title">
+            <string>Greedy build first</string>
+           </property>
+           <layout class="QHBoxLayout" name="horizontalLayout_4">
+            <item>
+             <widget class="QComboBox" name="comboBox">
+              <item>
+               <property name="text">
+                <string>by_timewin</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="pushButton">
+              <property name="text">
+               <string>Plot</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </widget>
          </item>
         </layout>
