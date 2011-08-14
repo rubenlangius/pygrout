@@ -540,4 +540,4 @@ def join_routes(sol, r1, r2):
     # print sol.r[r1][R_EDG]
     sol.r.pop(r2)
     sol.k -= 1
-
+    sol.dist -= sol.d(c, 0) + sol.d(0, d) - sol.d(c, d)
