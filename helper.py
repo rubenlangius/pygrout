@@ -51,7 +51,10 @@ class Helper(QtGui.QDialog):
         QtCore.QObject.connect(self.worker, QtCore.SIGNAL("finished()"), self.background_done)
         QtCore.QObject.connect(self.worker, QtCore.SIGNAL("terminated()"), self.background_done)
         QtCore.QObject.connect(self, QtCore.SIGNAL("progress(int)"), self.update_progress)
-
+        # a single pool for processing
+        from multiprocessing import Pool
+        self.p = Pool()
+        
     def background_done(self):
         self.ui.update.setEnabled(True)
         self.ui.progressBar.setEnabled(False)
@@ -73,13 +76,11 @@ class Helper(QtGui.QDialog):
         watch = StopWatch()
         mi = self.ui.mi.value()
         waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
-        from multiprocessing import Pool
         from itertools import repeat
-        p = Pool()
         tasks = zip(self.tests_chosen(), repeat(waitlimit), repeat(mi))
         numDone = 0
         data = []
-        for result in p.imap(savings_val, tasks):
+        for result in self.p.imap(savings_val, tasks):
             data.append(result)
             numDone += 1
             self.emit(QtCore.SIGNAL('progress(int)'), numDone)

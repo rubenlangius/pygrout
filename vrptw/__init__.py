@@ -217,6 +217,10 @@ class VrptwSolution(object):
                 return False
         if len(unserviced) and complete:
             error("Unserviced customers left: " + ", ".join(str(x) for x in sorted(unserviced)))
+        total_dist = sum(self.r[i][R_DIS] for i in xrange(self.k))
+        if abs(total_dist - self.dist) > 1e-3:
+            error("Wrong total dist: %f, while sum: %f" % (total_dist, self.dist))
+            return False
         return True
     
     def check_full(self):
@@ -250,6 +254,9 @@ class VrptwSolution(object):
             now = actual + self.t(fro, to)
         if l != self.r[i][R_LEN]:
             error("Wrong length %d (actual %d) for route %d" % (self.r[i][R_LEN], l, i))
+            return False
+        if abs(dist - self.r[i][R_DIS]) > 1e-4:
+            error("Wrong total distance %f (actual %f) for route %d" % (self.r[i][R_DIS], dist, i))
             return False
         return True
         
@@ -288,7 +295,7 @@ class VrptwSolution(object):
         if os.path.exists(target_path):
             print "File %s - such solution already exists" % target_path
         else:
-            cPickle.dump(save_data, open(target_path, 'wb'))
+            cPickle.dump(save_data, open(targactualet_path, 'wb'))
             
         # not writing the copy - use the export command
         # open(os.path.join(sol.outdir, save_name.replace('.p', '.vrp')), 'w').write(sol.flatten())
@@ -520,7 +527,7 @@ def find_allpos_on(sol, c, r, startpos=0):
         if  arr_c <= larr_c and not arr_a <= larr_a:
             print "yes, this ever happens..."
         if  arr_c <= larr_c and arr_a <= larr_a:
-            # for some cases distinc in optional...
+            # for some cases distinc in optactualional...
             distinc = -(dist[a][c] + dist[c][b] - dist[a][b])
             yield (distinc, pos)
 
@@ -531,13 +538,15 @@ def join_routes(sol, r1, r2):
     c, _, arr_c, _ = sol.r[r1][R_EDG].pop()
     _, d, _, larr_d = sol.r[r2][R_EDG].pop(0)
     pos = sol.r[r1][R_LEN]-1
+    saving = sol.d(c, 0) + sol.d(0, d) - sol.d(c, d)
     sol.r[r1][R_EDG].append([c, d, arr_c, larr_d])
     sol.r[r1][R_EDG].extend(sol.r[r2][R_EDG])
     sol.r[r1][R_LEN] += sol.r[r2][R_LEN]-1
     sol.r[r1][R_CAP] += sol.r[r2][R_CAP]
+    sol.r[r1][R_DIS] += sol.r[r2][R_DIS] - saving
     propagate_arrival(sol, r1, pos)
     propagate_deadline(sol, r1, pos)
     # print sol.r[r1][R_EDG]
     sol.r.pop(r2)
     sol.k -= 1
-    sol.dist -= sol.d(c, 0) + sol.d(0, d) - sol.d(c, d)
+    sol.dist -= saving
