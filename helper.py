@@ -18,10 +18,16 @@ def savings_val(task):
     name, waitlimit, mi = task
     from pygrout import VrptwSolution, VrptwTask, build_by_savings    
     print "Should process", name
-    sol = VrptwSolution(VrptwTask(open(name)))
+    sol = VrptwSolution(VrptwTask(name))
     build_by_savings(sol, waitlimit, mi)
     return sol.val()
 
+def best_val(name):
+    """The mapping function for best known value."""
+    from pygrout import VrptwTask
+    task = VrptwTask(name, False)
+    return task.bestval()
+ 
 class Worker(QtCore.QThread):
     def __init__(self, helper, parent = None):
         super(Worker, self).__init__(parent)
@@ -64,6 +70,7 @@ class Helper(QtGui.QDialog):
         self.ui.progressBar.setEnabled(True)
         self.ui.progressBar.setMaximum(len(self.tests_chosen()))
         self.ui.progressBar.setValue(0)
+        self.operation = 'savings'
         self.worker.start()
         
     def update_progress(self, progress):
@@ -80,7 +87,12 @@ class Helper(QtGui.QDialog):
         tasks = zip(self.tests_chosen(), repeat(waitlimit), repeat(mi))
         numDone = 0
         data = []
-        for result in self.p.imap(savings_val, tasks):
+        iterator = []
+        if self.operation == 'savings':
+            iterator = self.p.imap(savings_val, tasks)
+        else:
+            iterator = self.p.imap(best_val, self.tests_chosen())
+        for result in iterator:
             data.append(result)
             numDone += 1
             self.emit(QtCore.SIGNAL('progress(int)'), numDone)
@@ -98,7 +110,13 @@ class Helper(QtGui.QDialog):
                 
     def plot_best(self):
         print self.tests_chosen()
-    
+        self.ui.update.setEnabled(False)
+        self.ui.progressBar.setEnabled(True)
+        self.ui.progressBar.setMaximum(len(self.tests_chosen()))
+        self.ui.progressBar.setValue(0)
+        self.operation = 'best'
+        self.worker.start()
+            
     def accept(self):
         QtGui.QDialog.accept(self)
         

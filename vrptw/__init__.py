@@ -40,7 +40,7 @@ class VrptwTask(object):
     
     sort_order = 'by_timewin'
     
-    def __init__(self, stream):
+    def __init__(self, stream, precompute = True):
         if type(stream)==str: stream = open(stream)
         lines = stream.readlines()
         self.filename = stream.name
@@ -51,7 +51,8 @@ class VrptwTask(object):
         import array
         self.cust = [ array.array('i', map(int, x.split())) for x in lines[9:] ]
         self.N = len(self.cust)-1
-        self.precompute()
+        if precompute:
+            self.precompute()
         self.load_best()
         
     def precompute(self):
@@ -111,6 +112,10 @@ class VrptwTask(object):
             if os.path.exists(os.path.join('bestknown', self.name+'.txt')):
                 raise
             
+    def bestval(self):
+        """Return best value pair."""
+        return (self.best_k, self.best_dist)
+    
 def error(msg):
     """A function to print or suppress errors."""
     print msg
