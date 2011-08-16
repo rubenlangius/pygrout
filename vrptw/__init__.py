@@ -295,7 +295,7 @@ class VrptwSolution(object):
         if os.path.exists(target_path):
             print "File %s - such solution already exists" % target_path
         else:
-            cPickle.dump(save_data, open(targactualet_path, 'wb'))
+            cPickle.dump(save_data, open(target_path, 'wb'))
             
         # not writing the copy - use the export command
         # open(os.path.join(sol.outdir, save_name.replace('.p', '.vrp')), 'w').write(sol.flatten())
@@ -527,7 +527,7 @@ def find_allpos_on(sol, c, r, startpos=0):
         if  arr_c <= larr_c and not arr_a <= larr_a:
             print "yes, this ever happens..."
         if  arr_c <= larr_c and arr_a <= larr_a:
-            # for some cases distinc in optactualional...
+            # for some cases distinc in optional...
             distinc = -(dist[a][c] + dist[c][b] - dist[a][b])
             yield (distinc, pos)
 
