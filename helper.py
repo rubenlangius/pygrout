@@ -99,6 +99,7 @@ class Helper(QtGui.QDialog):
         print data
         self.ax_k.plot([x[0] for x in data], '.')
         self.ax_d.plot([x[1] for x in data], '.')
+        self.ui.textEdit.append("Processing finished in %s seconds" % watch) 
         print "What now?", watch
         self.fig.canvas.draw()
 

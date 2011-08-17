@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'helper.ui'
 #
-# Created: Mon Aug 15 00:47:56 2011
+# Created: Thu Aug 18 00:24:30 2011
 #      by: PyQt4 UI code generator 4.8.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -38,6 +38,15 @@ class Ui_Helper(object):
         self.families = QtGui.QListWidget(self.groupBox_2)
         self.families.setMinimumSize(QtCore.QSize(30, 80))
         self.families.setObjectName(_fromUtf8("families"))
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
+        QtGui.QListWidgetItem(self.families)
         QtGui.QListWidgetItem(self.families)
         QtGui.QListWidgetItem(self.families)
         QtGui.QListWidgetItem(self.families)
@@ -92,11 +101,25 @@ class Ui_Helper(object):
         self.comboBox.addItem(_fromUtf8(""))
         self.horizontalLayout_4.addWidget(self.comboBox)
         self.pushButton = QtGui.QPushButton(self.groupBox_3)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.pushButton.sizePolicy().hasHeightForWidth())
+        self.pushButton.setSizePolicy(sizePolicy)
         self.pushButton.setObjectName(_fromUtf8("pushButton"))
         self.horizontalLayout_4.addWidget(self.pushButton)
         self.verticalLayout_2.addWidget(self.groupBox_3)
         self.horizontalLayout_2.addWidget(self.groupBox_4)
         self.verticalLayout.addWidget(self.widget)
+        self.textEdit = QtGui.QTextEdit(Helper)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.textEdit.sizePolicy().hasHeightForWidth())
+        self.textEdit.setSizePolicy(sizePolicy)
+        self.textEdit.setReadOnly(True)
+        self.textEdit.setObjectName(_fromUtf8("textEdit"))
+        self.verticalLayout.addWidget(self.textEdit)
         self.progressBar = QtGui.QProgressBar(Helper)
         self.progressBar.setMaximum(100)
         self.progressBar.setProperty(_fromUtf8("value"), 0)
@@ -115,14 +138,23 @@ class Ui_Helper(object):
         self.families.setSortingEnabled(False)
         self.families.item(0).setText(QtGui.QApplication.translate("Helper", "solomons/*.txt", None, QtGui.QApplication.UnicodeUTF8))
         self.families.item(1).setText(QtGui.QApplication.translate("Helper", "solomons/c*.txt", None, QtGui.QApplication.UnicodeUTF8))
-        self.families.item(2).setText(QtGui.QApplication.translate("Helper", "solomons/r[12]*.txt", None, QtGui.QApplication.UnicodeUTF8))
-        self.families.item(3).setText(QtGui.QApplication.translate("Helper", "solomons/rc*.txt", None, QtGui.QApplication.UnicodeUTF8))
-        self.families.item(4).setText(QtGui.QApplication.translate("Helper", "solomons/c1*.txt", None, QtGui.QApplication.UnicodeUTF8))
-        self.families.item(5).setText(QtGui.QApplication.translate("Helper", "solomons/c2*.txt", None, QtGui.QApplication.UnicodeUTF8))
-        self.families.item(6).setText(QtGui.QApplication.translate("Helper", "solomons/r1*.txt", None, QtGui.QApplication.UnicodeUTF8))
-        self.families.item(7).setText(QtGui.QApplication.translate("Helper", "solomons/r2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(2).setText(QtGui.QApplication.translate("Helper", "solomons/c1*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(3).setText(QtGui.QApplication.translate("Helper", "solomons/c2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(4).setText(QtGui.QApplication.translate("Helper", "solomons/r[12]*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(5).setText(QtGui.QApplication.translate("Helper", "solomons/r1*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(6).setText(QtGui.QApplication.translate("Helper", "solomons/r2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(7).setText(QtGui.QApplication.translate("Helper", "solomons/rc*.txt", None, QtGui.QApplication.UnicodeUTF8))
         self.families.item(8).setText(QtGui.QApplication.translate("Helper", "solomons/rc1*.txt", None, QtGui.QApplication.UnicodeUTF8))
         self.families.item(9).setText(QtGui.QApplication.translate("Helper", "solomons/rc2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(10).setText(QtGui.QApplication.translate("Helper", "hombergers/c?_2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(11).setText(QtGui.QApplication.translate("Helper", "hombergers/c1_2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(12).setText(QtGui.QApplication.translate("Helper", "hombergers/c2_2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(13).setText(QtGui.QApplication.translate("Helper", "hombergers/r[12]_2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(14).setText(QtGui.QApplication.translate("Helper", "hombergers/r1_2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(15).setText(QtGui.QApplication.translate("Helper", "hombergers/r2_2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(16).setText(QtGui.QApplication.translate("Helper", "hombergers/rc?_2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(17).setText(QtGui.QApplication.translate("Helper", "hombergers/rc1_2*.txt", None, QtGui.QApplication.UnicodeUTF8))
+        self.families.item(18).setText(QtGui.QApplication.translate("Helper", "hombergers/rc2_2*.txt", None, QtGui.QApplication.UnicodeUTF8))
         self.families.setSortingEnabled(__sortingEnabled)
         self.best.setText(QtGui.QApplication.translate("Helper", "Plot best", None, QtGui.QApplication.UnicodeUTF8))
         self.groupBox_4.setTitle(QtGui.QApplication.translate("Helper", "Construction heuristic", None, QtGui.QApplication.UnicodeUTF8))
@@ -133,4 +165,9 @@ class Ui_Helper(object):
         self.groupBox_3.setTitle(QtGui.QApplication.translate("Helper", "Greedy build first", None, QtGui.QApplication.UnicodeUTF8))
         self.comboBox.setItemText(0, QtGui.QApplication.translate("Helper", "by_timewin", None, QtGui.QApplication.UnicodeUTF8))
         self.pushButton.setText(QtGui.QApplication.translate("Helper", "Plot", None, QtGui.QApplication.UnicodeUTF8))
+        self.textEdit.setHtml(QtGui.QApplication.translate("Helper", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
+"<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
+"p, li { white-space: pre-wrap; }\n"
+"</style></head><body style=\" font-family:\'Ubuntu\'; font-size:9pt; font-weight:400; font-style:normal;\">\n"
+"<p style=\" margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;\">Welcome to route construction tester. This is a notification console.</p></body></html>", None, QtGui.QApplication.UnicodeUTF8))
 
