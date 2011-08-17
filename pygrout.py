@@ -171,10 +171,16 @@ def build_by_savings(sol, wait_limit = None, mi = 1):
         sav, wt, r1, r2 = max(savings)
         # print 'saving', sav, 'by join of', r1, r2, 'wait', wt, 'in', sol.task.name
         join_routes(sol, r1, r2)
-        sol.check()
+        # turned off for efficiency (now assumed correct)
+        # sol.check()
     u.commit()
     return sol
 
+def build_by_mfsavings(self):
+    """Build by maybe faster savings heuristic implementation.
+    Should actually provide the same results as 'normal' O(n**3) savings."""
+    # TODO: precompute all possible joins (edges)
+    
 def local_search(sol, oper, end=0, verb=False, speed=None):
     """Optimize solution by local search."""
     # local rebinds
