@@ -1,18 +1,30 @@
 #!/usr/bin/env python
 
 import sys
+import glob
 
 import matplotlib
 matplotlib.use('Qt4Agg')
 import pylab
 
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QTAgg as NavigationToolbar  
 from matplotlib.figure import Figure
 
 
 from PyQt4 import QtCore, QtGui
 from ui_helper import Ui_Helper
 
+class reverse(object):
+    """Tiny class for callable reverse mappings."""
+    def __init__(self, items):
+        from itertools import count
+        self.d = dict(zip(items, count(1)))
+    def __call__(self, key):
+        return self.d[key]
+
+all_sets = sorted(glob.glob('solomons/*.txt')) + sorted(glob.glob('hombergers/*.txt'), key=lambda x: x.replace('_','0'))
+set_num = reverse(all_sets)
+    
 def savings_val(task):
     """The mapping function for savings heuristic."""
     name, waitlimit, mi = task
@@ -49,6 +61,9 @@ class Helper(QtGui.QDialog):
         # the canvas:
         self.canvas = FigureCanvas(self.fig)
         self.ui.verticalLayout.addWidget(self.canvas)
+        # and its toolbar
+        self.toolbar = NavigationToolbar(self.canvas, self)
+        self.ui.verticalLayout.addWidget(self.toolbar)
         # the worker thread (one, for now)
         self.worker = Worker(self)
         # custom slots
@@ -84,30 +99,31 @@ class Helper(QtGui.QDialog):
         mi = self.ui.mi.value()
         waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
         from itertools import repeat
-        tasks = zip(self.tests_chosen(), repeat(waitlimit), repeat(mi))
+        set_names = self.tests_chosen()
+        tasks = zip(set_names, repeat(waitlimit), repeat(mi))
         numDone = 0
         data = []
         iterator = []
         if self.operation == 'savings':
             iterator = self.p.imap(savings_val, tasks)
         else:
-            iterator = self.p.imap(best_val, self.tests_chosen())
+            iterator = self.p.imap(best_val, set_names)
         for result in iterator:
             data.append(result)
             numDone += 1
             self.emit(QtCore.SIGNAL('progress(int)'), numDone)
         print data
-        self.ax_k.plot([x[0] for x in data], '.')
-        self.ax_d.plot([x[1] for x in data], '.')
+        xcoords = map(set_num, set_names)
+        self.ax_k.plot(xcoords, [x[0] for x in data], '.')
+        self.ax_d.plot(xcoords, [x[1] for x in data], '.')
         self.ui.textEdit.append("Processing finished in %s seconds" % watch) 
         print "What now?", watch
         self.fig.canvas.draw()
 
     def tests_chosen(self):
         """Return a sorted list of filenames by pattern in the families list."""
-        from glob import glob
         pattern = str(self.ui.families.currentItem().text())
-        return sorted(glob(pattern))
+        return sorted(glob.glob(pattern))
                 
     def plot_best(self):
         print self.tests_chosen()
