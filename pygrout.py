@@ -176,11 +176,22 @@ def build_by_savings(sol, wait_limit = None, mi = 1):
     u.commit()
     return sol
 
-def build_by_mfsavings(self):
+def build_by_mfsavings(sol, wait_limit = None, mi = 1):
     """Build by maybe faster savings heuristic implementation.
     Should actually provide the same results as 'normal' O(n**3) savings."""
-    # TODO: precompute all possible joins (edges)
-    
+    prevs = [0] * (sol.N+1)
+    nexts = [0] * (sol.N+1)
+    route = range(sol.N+1)
+    possible = [ (mi*sol.d(i,j) - sol.d(0, i) - sol.d(j, 0), i, j) 
+    for i in xrange(1, sol.N+1)
+        for j in xrange(1, sol.N+1)
+            if i <> j ]
+    possible.sort()         
+    # TODO: check validity and perform savings
+    for sav, i, j in possible:
+        pass
+    return sol
+
 def local_search(sol, oper, end=0, verb=False, speed=None):
     """Optimize solution by local search."""
     # local rebinds
