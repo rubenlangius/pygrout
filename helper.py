@@ -49,16 +49,62 @@ class ArgMap(object):
         return self.d[el]
 
 # temporary solution (retrofitted)  -- will be changed, 
-set_num = ArgMap()
+
+
+class Plot(object):
+    """This encapsulates details connected with the plot."""
+    def __init__(self, helper):
+        self.helper = helper
+        self.fig = Figure(figsize=(600,600), dpi=72, facecolor=(1,1,1), edgecolor=(0,0,0))
+        self.ax_k = self.fig.add_subplot(211)
+        self.ax_d = self.fig.add_subplot(212)
+        # the canvas:
+        self.canvas = FigureCanvas(self.fig)
+        # and its toolbar
+        self.toolbar = NavigationToolbar(self.canvas, helper)
+        self.attachTo(helper.ui.verticalLayout)
+        self.argmap = ArgMap()
             
+    def attachTo(self, layout):
+        layout.addWidget(self.canvas)
+        layout.addWidget(self.toolbar)
+        
+    def display(self, operation):
+        xcoords = map(self.argmap, operation.args)
+        self.ax_k.plot(xcoords, [x[0] for x in operation.results], '.', label=operation.get_name())
+        self.ax_k.legend()
+        self.ax_d.plot(xcoords, [x[1] for x in operation.results], '.')
+        self.canvas.draw()
+                
 class Operation(object):
     """An abstract operation for the sets to perform"""
     def __init__(self, args):
-        self.args = args
+        if type(args) == str:
+            self.args = self.find_args(args)
+        else:
+            self.args = args
+        self.results = []
         
     def find_args(self, argstr):
         from glob import glob
-        
+        return sorted(glob(argstr))
+
+    def get_name(self):
+        """Description of operation, e.g. for plot label."""
+        return 'abstract'
+
+def best_val(name):
+    """The mapping function for best known value."""
+    from pygrout import VrptwTask
+    task = VrptwTask(name, False)
+    return task.bestval()
+
+class BestOperation(Operation):
+    def get_iterator(self, worker):
+        return worker.p.imap(best_val, self.args)
+    def get_name(self):
+        return 'b.known'
+
 def savings_val(task):
     """The mapping function for savings heuristic."""
     name, waitlimit, mi = task
@@ -68,19 +114,54 @@ def savings_val(task):
     build_by_savings(sol, waitlimit, mi)
     return sol.val()
 
-def best_val(name):
-    """The mapping function for best known value."""
-    from pygrout import VrptwTask
-    task = VrptwTask(name, False)
-    return task.bestval()
- 
+class SavingsOperation(Operation):
+    def __init__(self, args, mi, waitlimit):
+        Operation.__init__(self, args)
+        self.mi = mi
+        self.waitlimit = waitlimit
+    
+    def get_iterator(self, worker):
+        from itertools import repeat
+        tasks = zip(self.args, repeat(self.waitlimit), repeat(self.mi))
+        return worker.p.imap(savings_val, tasks)
+    
+    def get_name(self):
+        desc ="sav(%.1f)" % self.mi
+        if self.waitlimit:
+            desc += "WL(%d)" % self.waitlimit
+        return desc
+         
 class Worker(QtCore.QThread):
     def __init__(self, helper, parent = None):
         super(Worker, self).__init__(parent)
         self.helper = helper
-        
+        # custom signals for the GUI
+        QtCore.QObject.connect(self, QtCore.SIGNAL("progress(int)"), helper.update_progress)
+        QtCore.QObject.connect(self, QtCore.SIGNAL("newProgress(int)"), helper.init_progress)
+        # terminating signals for the GUI
+        QtCore.QObject.connect(self, QtCore.SIGNAL("finished()"), helper.background_done)
+        QtCore.QObject.connect(self, QtCore.SIGNAL("terminated()"), helper.background_done)
+        # the operation, passed before starting the thread
+        self.currentOp = None
+        # a single pool for processing
+        from multiprocessing import Pool
+        self.p = Pool()
+                
     def run(self):
-        self.helper.redraw()
+        if not self.currentOp:
+            return
+        self.emit(QtCore.SIGNAL('newProgress(int)'), len(self.currentOp.args))
+        numDone = 0
+        for res in self.currentOp.get_iterator(self):
+            self.currentOp.results.append(res)
+            numDone += 1
+            self.emit(QtCore.SIGNAL('progress(int)'), numDone)
+        self.helper.plot.display(self.currentOp)
+        
+    def performOperation(self, operation):
+        self.currentOp = operation
+        self.helper.lock_ui()
+        self.start()
         
 class Helper(QtGui.QDialog):
     def __init__(self, parent=None):
@@ -89,92 +170,53 @@ class Helper(QtGui.QDialog):
         self.ui = Ui_Helper()
         self.ui.setupUi(self)
         # add custom mpl canvas
-        self.fig = Figure(figsize=(600,600), dpi=72, facecolor=(1,1,1), edgecolor=(0,0,0))
-        self.ax_k = self.fig.add_subplot(211)
-        self.ax_d = self.fig.add_subplot(212)
-        # the canvas:
-        self.canvas = FigureCanvas(self.fig)
-        self.ui.verticalLayout.addWidget(self.canvas)
-        # and its toolbar
-        self.toolbar = NavigationToolbar(self.canvas, self)
-        self.ui.verticalLayout.addWidget(self.toolbar)
+        self.plot = Plot(self)
         # the worker thread (one, for now)
         self.worker = Worker(self)
-        # custom slots
+        # the stopwatch placeholder
+        self.watch = '(no watch set!)'
+
         QtCore.QObject.connect(self.ui.update, QtCore.SIGNAL("clicked()"), self.plot_savings)
         QtCore.QObject.connect(self.ui.best, QtCore.SIGNAL("clicked()"), self.plot_best)
-        QtCore.QObject.connect(self.worker, QtCore.SIGNAL("finished()"), self.background_done)
-        QtCore.QObject.connect(self.worker, QtCore.SIGNAL("terminated()"), self.background_done)
-        QtCore.QObject.connect(self, QtCore.SIGNAL("progress(int)"), self.update_progress)
-        # a single pool for processing
-        from multiprocessing import Pool
-        self.p = Pool()
-        
-    def background_done(self):
-        self.ui.update.setEnabled(True)
-        self.ui.progressBar.setEnabled(False)
-        
-    def plot_savings(self):
+    
+    def lock_ui(self):
+        """Called before entering the background operation."""
+        from stopwatch import StopWatch
+        self.watch = StopWatch()
         self.ui.update.setEnabled(False)
-        self.ui.progressBar.setEnabled(True)
-        self.ui.progressBar.setMaximum(len(self.tests_chosen()))
-        self.ui.progressBar.setValue(0)
-        self.operation = 'savings'
-        self.worker.start()
+        self.ui.best.setEnabled(False)
+                
+    def background_done(self):
+        """Slot to unlock some UI elements after finished background operation."""
+        self.ui.update.setEnabled(True)
+        self.ui.best.setEnabled(True)
+        self.ui.progressBar.setEnabled(False)
+        self.ui.textEdit.append("Processing finished in %s seconds" % self.watch) 
+        print "What now?", self.watch
         
+    def plot_best(self):
+        self.worker.performOperation(BestOperation(self.tests_chosen()))
+            
+    def plot_savings(self):
+        mi = self.ui.mi.value()
+        waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
+        self.worker.performOperation(SavingsOperation(self.tests_chosen(), mi, waitlimit))
+                
+    def init_progress(self, maxProgress):
+        """Slot for resetting the progress bar's value to 0 with a new maximum."""
+        self.ui.progressBar.setEnabled(True)
+        self.ui.progressBar.setMaximum(maxProgress)
+        self.ui.progressBar.setValue(0)
+
     def update_progress(self, progress):
-        """The slot for updating progress in event thread."""
+        """Slot for updating the progress bar."""
         print "--- one done ---"
         self.ui.progressBar.setValue(progress)
         
-    def redraw(self):
-        from stopwatch import StopWatch
-        watch = StopWatch()
-        mi = self.ui.mi.value()
-        waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
-        from itertools import repeat
-        set_names = self.tests_chosen()
-        tasks = zip(set_names, repeat(waitlimit), repeat(mi))
-        numDone = 0
-        data = []
-        iterator = []
-        if self.operation == 'savings':
-            iterator = self.p.imap(savings_val, tasks)
-        else:
-            iterator = self.p.imap(best_val, set_names)
-        for result in iterator:
-            data.append(result)
-            numDone += 1
-            self.emit(QtCore.SIGNAL('progress(int)'), numDone)
-        print data
-        xcoords = map(set_num, set_names)
-        self.ax_k.plot(xcoords, [x[0] for x in data], 'x', label=self.operation)
-        self.ax_k.legend()
-        self.ax_d.plot(xcoords, [x[1] for x in data], '-')
-        self.ui.textEdit.append("Processing finished in %s seconds" % watch) 
-        print "What now?", watch
-        self.fig.canvas.draw()
-
     def tests_chosen(self):
-        """Return a sorted list of filenames by pattern in the families list."""
-        pattern = str(self.ui.families.currentItem().text())
-        return sorted(glob.glob(pattern))
-                
-    def plot_best(self):
-        print self.tests_chosen()
-        self.ui.update.setEnabled(False)
-        self.ui.progressBar.setEnabled(True)
-        self.ui.progressBar.setMaximum(len(self.tests_chosen()))
-        self.ui.progressBar.setValue(0)
-        self.operation = 'best'
-        self.worker.start()
-            
-    def accept(self):
-        QtGui.QDialog.accept(self)
+        """Return the selected pattern in the families list."""
+        return str(self.ui.families.currentItem().text())
         
-    def reject(self):
-        QtGui.QDialog.reject(self)
-
 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
