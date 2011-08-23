@@ -278,6 +278,13 @@ p, li { white-space: pre-wrap; }
     </widget>
    </item>
    <item>
+    <widget class="QPushButton" name="clearPlot">
+     <property name="text">
+      <string>Clear plot area</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QProgressBar" name="progressBar">
      <property name="maximum">
       <number>100</number>
