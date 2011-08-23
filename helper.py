@@ -14,17 +14,51 @@ from matplotlib.figure import Figure
 from PyQt4 import QtCore, QtGui
 from ui_helper import Ui_Helper
 
-class reverse(object):
-    """Tiny class for callable reverse mappings."""
-    def __init__(self, items):
-        from itertools import count
-        self.d = dict(zip(items, count(1)))
-    def __call__(self, key):
-        return self.d[key]
-
-all_sets = sorted(glob.glob('solomons/*.txt')) + sorted(glob.glob('hombergers/*.txt'), key=lambda x: x.replace('_','0'))
-set_num = reverse(all_sets)
+class ArgMap(object):
+    """A class for determining indexes of sets on the plot."""
     
+    def __init__(self):
+        self.reset()
+        
+    def reset(self):
+        """Empty the mapping and counters. Also initialize."""
+        self.d = {}
+        self.n = 0
+        self.ticks = []
+        self.ticklabels = []
+
+    def checkTick(self, el):
+        """Called by addOne - checks if element is first of a family."""
+        if el.replace('_', '0').find('01.') <> -1:
+            self.ticks.append(self.d[el])
+            self.ticklabels.append(el[el.index('/')+1:el.index('.')])
+        
+    def addOne(self, el):
+        """Single unckecked additon (use __call__ to add safely)."""
+        self.n = self.d[el] = self.n+1
+        self.checkTick(el)
+        
+    def add(self, els):
+        """Adding multiple elements from an iterable."""
+        map(self, els)
+        
+    def __call__(self, el):
+        """Calling the object does safe mapping of element to index."""
+        if el not in self.d:
+            self.addOne(el)
+        return self.d[el]
+
+# temporary solution (retrofitted)  -- will be changed, 
+set_num = ArgMap()
+            
+class Operation(object):
+    """An abstract operation for the sets to perform"""
+    def __init__(self, args):
+        self.args = args
+        
+    def find_args(self, argstr):
+        from glob import glob
+        
 def savings_val(task):
     """The mapping function for savings heuristic."""
     name, waitlimit, mi = task
@@ -114,8 +148,9 @@ class Helper(QtGui.QDialog):
             self.emit(QtCore.SIGNAL('progress(int)'), numDone)
         print data
         xcoords = map(set_num, set_names)
-        self.ax_k.plot(xcoords, [x[0] for x in data], '.')
-        self.ax_d.plot(xcoords, [x[1] for x in data], '.')
+        self.ax_k.plot(xcoords, [x[0] for x in data], 'x', label=self.operation)
+        self.ax_k.legend()
+        self.ax_d.plot(xcoords, [x[1] for x in data], '-')
         self.ui.textEdit.append("Processing finished in %s seconds" % watch) 
         print "What now?", watch
         self.fig.canvas.draw()

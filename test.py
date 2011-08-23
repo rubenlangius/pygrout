@@ -96,6 +96,22 @@ def test_find_pos():
                         assert best in allp
                         assert best == max(allp)
 
+def test_argmap():
+    """Test of the class ArgMap from helper.py"""
+    try:
+        from helper import ArgMap
+    except ImportError:
+        print "Missing something: PyQt or matplotlib etc."
+        return
+    from glob import glob
+    m = ArgMap()
+    files = glob("solomons/r*")
+    files.sort() 
+    m.add(files)
+    assert m(files[0]) == 1
+    assert m.ticklabels == ['r101', 'r201', 'rc101', 'rc201']
+    assert m.ticks == [1, 13, 24, 23]
+    
 # Test left out, reenable in case of trouble ;)
 def _test_initial_creation():
     """Unit test for creating solutions to all included benchmarks."""
