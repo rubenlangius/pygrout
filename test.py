@@ -105,12 +105,12 @@ def test_argmap():
         return
     from glob import glob
     m = ArgMap()
-    files = glob("solomons/r*")
+    files = glob("solomons/r1*")
     files.sort() 
     m.add(files)
     assert m(files[0]) == 1
-    assert m.ticklabels == ['r101', 'r201', 'rc101', 'rc201']
-    assert m.ticks == [1, 13, 24, 23]
+    assert m.ticklabels == ['r101', 'r106']
+    assert m.ticks == [1, 6]
     
 # Test left out, reenable in case of trouble ;)
 def _test_initial_creation():

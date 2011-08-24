@@ -278,19 +278,19 @@ p, li { white-space: pre-wrap; }
     </widget>
    </item>
    <item>
-    <widget class="QPushButton" name="clearPlot">
-     <property name="text">
-      <string>Clear plot area</string>
-     </property>
-    </widget>
-   </item>
-   <item>
     <widget class="QProgressBar" name="progressBar">
      <property name="maximum">
       <number>100</number>
      </property>
      <property name="value">
       <number>0</number>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QPushButton" name="clearPlot">
+     <property name="text">
+      <string>Reset plot</string>
      </property>
     </widget>
    </item>
