@@ -29,7 +29,8 @@ class ArgMap(object):
 
     def checkTick(self, el):
         """Called by addOne - checks if element is first of a family."""
-        if el.replace('_', '0').find('01.') <> -1:
+        norm = el.replace('_', '0')
+        if norm.find('01.') <> -1 or norm.find('06.') <> -1:
             self.ticks.append(self.d[el])
             self.ticklabels.append(el[el.index('/')+1:el.index('.')])
         
@@ -48,9 +49,6 @@ class ArgMap(object):
             self.addOne(el)
         return self.d[el]
 
-# temporary solution (retrofitted)  -- will be changed, 
-
-
 class Plot(object):
     """This encapsulates details connected with the plot."""
     def __init__(self, helper):
@@ -64,16 +62,49 @@ class Plot(object):
         self.toolbar = NavigationToolbar(self.canvas, helper)
         self.attachTo(helper.ui.verticalLayout)
         self.argmap = ArgMap()
-            
+        self._setup_plots()
+        self._update_ticks()
+    
+    def _setup_plots(self):        
+        self.ax_k.set_ylabel('route count')
+        self.ax_d.set_ylabel('total distance')
+
+    def _update_ticks(self):        
+        self.ax_k.set_xlim((0, self.argmap.n+1))
+        self.ax_k.set_xticks(self.argmap.ticks)
+        self.ax_k.set_xticklabels(self.argmap.ticklabels)
+        self.ax_d.set_xlim((0, self.argmap.n+1))
+        self.ax_d.set_xticks(self.argmap.ticks)
+        self.ax_d.set_xticklabels(self.argmap.ticklabels)
+
     def attachTo(self, layout):
         layout.addWidget(self.canvas)
         layout.addWidget(self.toolbar)
         
+    def reset(self):
+        """Remove plotted data from the drawing area."""
+        self.argmap.reset()
+        self.ax_k.cla()
+        self.ax_d.cla()
+        self._setup_plots()
+        self._update_ticks()
+        self.canvas.draw()
+        
     def display(self, operation):
         xcoords = map(self.argmap, operation.args)
-        self.ax_k.plot(xcoords, [x[0] for x in operation.results], '.', label=operation.get_name())
+        lbl = operation.get_name()
+        self.ax_k.plot(xcoords, operation.ks, 'o', label=lbl)
         self.ax_k.legend()
-        self.ax_d.plot(xcoords, [x[1] for x in operation.results], '.')
+        ymin, ymax = self.ax_k.get_ylim()
+        self.ax_k.set_ylim((ymin-1, ymax+1)) 
+        
+        self.ax_d.plot(xcoords, operation.ds, '.', label=lbl)
+        self.ax_d.legend()
+        ymin, ymax = self.ax_d.get_ylim()
+        spread = (ymax - ymin)*.03
+        self.ax_d.set_ylim((ymin-spread, ymax+spread)) 
+        
+        self._update_ticks()
         self.canvas.draw()
                 
 class Operation(object):
@@ -83,7 +114,8 @@ class Operation(object):
             self.args = self.find_args(args)
         else:
             self.args = args
-        self.results = []
+        self.ks = []
+        self.ds = []
         
     def find_args(self, argstr):
         from glob import glob
@@ -132,6 +164,7 @@ class SavingsOperation(Operation):
         return desc
          
 class Worker(QtCore.QThread):
+    """An active object for background computations."""
     def __init__(self, helper, parent = None):
         super(Worker, self).__init__(parent)
         self.helper = helper
@@ -152,8 +185,9 @@ class Worker(QtCore.QThread):
             return
         self.emit(QtCore.SIGNAL('newProgress(int)'), len(self.currentOp.args))
         numDone = 0
-        for res in self.currentOp.get_iterator(self):
-            self.currentOp.results.append(res)
+        for k, d in self.currentOp.get_iterator(self):
+            self.currentOp.ks.append(k)
+            self.currentOp.ds.append(d)
             numDone += 1
             self.emit(QtCore.SIGNAL('progress(int)'), numDone)
         self.helper.plot.display(self.currentOp)
@@ -178,6 +212,7 @@ class Helper(QtGui.QDialog):
 
         QtCore.QObject.connect(self.ui.update, QtCore.SIGNAL("clicked()"), self.plot_savings)
         QtCore.QObject.connect(self.ui.best, QtCore.SIGNAL("clicked()"), self.plot_best)
+        QtCore.QObject.connect(self.ui.clearPlot, QtCore.SIGNAL("clicked()"), self.clear_plot)
     
     def lock_ui(self):
         """Called before entering the background operation."""
@@ -202,6 +237,10 @@ class Helper(QtGui.QDialog):
         waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
         self.worker.performOperation(SavingsOperation(self.tests_chosen(), mi, waitlimit))
                 
+    def clear_plot(self):
+        """Slot for clearing the plot."""
+        self.plot.reset()
+        
     def init_progress(self, maxProgress):
         """Slot for resetting the progress bar's value to 0 with a new maximum."""
         self.ui.progressBar.setEnabled(True)
