@@ -203,6 +203,9 @@ class Helper(QtGui.QDialog):
         QtGui.QDialog.__init__(self, parent)
         self.ui = Ui_Helper()
         self.ui.setupUi(self)
+        # load sorting orders into combobox
+        from vrptw import sort_keys
+        self.ui.greedyOrder.addItems(sorted(sort_keys.keys()))
         # add custom mpl canvas
         self.plot = Plot(self)
         # the worker thread (one, for now)

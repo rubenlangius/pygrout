@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'helper.ui'
 #
-# Created: Wed Aug 24 13:29:41 2011
+# Created: Thu Aug 25 01:43:30 2011
 #      by: PyQt4 UI code generator 4.8.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -97,18 +97,17 @@ class Ui_Helper(object):
         self.groupBox_3.setObjectName(_fromUtf8("groupBox_3"))
         self.horizontalLayout_4 = QtGui.QHBoxLayout(self.groupBox_3)
         self.horizontalLayout_4.setObjectName(_fromUtf8("horizontalLayout_4"))
-        self.comboBox = QtGui.QComboBox(self.groupBox_3)
-        self.comboBox.setObjectName(_fromUtf8("comboBox"))
-        self.comboBox.addItem(_fromUtf8(""))
-        self.horizontalLayout_4.addWidget(self.comboBox)
-        self.pushButton = QtGui.QPushButton(self.groupBox_3)
+        self.greedyOrder = QtGui.QComboBox(self.groupBox_3)
+        self.greedyOrder.setObjectName(_fromUtf8("greedyOrder"))
+        self.horizontalLayout_4.addWidget(self.greedyOrder)
+        self.greedy = QtGui.QPushButton(self.groupBox_3)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Fixed, QtGui.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.pushButton.sizePolicy().hasHeightForWidth())
-        self.pushButton.setSizePolicy(sizePolicy)
-        self.pushButton.setObjectName(_fromUtf8("pushButton"))
-        self.horizontalLayout_4.addWidget(self.pushButton)
+        sizePolicy.setHeightForWidth(self.greedy.sizePolicy().hasHeightForWidth())
+        self.greedy.setSizePolicy(sizePolicy)
+        self.greedy.setObjectName(_fromUtf8("greedy"))
+        self.horizontalLayout_4.addWidget(self.greedy)
         self.verticalLayout_2.addWidget(self.groupBox_3)
         self.horizontalLayout_2.addWidget(self.groupBox_4)
         self.verticalLayout.addWidget(self.widget)
@@ -168,8 +167,7 @@ class Ui_Helper(object):
         self.has_waitlimit.setText(QtGui.QApplication.translate("Helper", "use waitlimit", None, QtGui.QApplication.UnicodeUTF8))
         self.update.setText(QtGui.QApplication.translate("Helper", "Plot", None, QtGui.QApplication.UnicodeUTF8))
         self.groupBox_3.setTitle(QtGui.QApplication.translate("Helper", "Greedy build first", None, QtGui.QApplication.UnicodeUTF8))
-        self.comboBox.setItemText(0, QtGui.QApplication.translate("Helper", "by_timewin", None, QtGui.QApplication.UnicodeUTF8))
-        self.pushButton.setText(QtGui.QApplication.translate("Helper", "Plot", None, QtGui.QApplication.UnicodeUTF8))
+        self.greedy.setText(QtGui.QApplication.translate("Helper", "Plot", None, QtGui.QApplication.UnicodeUTF8))
         self.textEdit.setHtml(QtGui.QApplication.translate("Helper", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
 "<html><head><meta name=\"qrichtext\" content=\"1\" /><style type=\"text/css\">\n"
 "p, li { white-space: pre-wrap; }\n"
