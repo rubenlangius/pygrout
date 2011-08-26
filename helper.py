@@ -3,6 +3,8 @@
 import sys
 import glob
 
+from itertools import repeat
+
 import matplotlib
 matplotlib.use('Qt4Agg')
 import pylab
@@ -153,7 +155,6 @@ class SavingsOperation(Operation):
         self.waitlimit = waitlimit
     
     def get_iterator(self, worker):
-        from itertools import repeat
         tasks = zip(self.args, repeat(self.waitlimit), repeat(self.mi))
         return worker.p.imap(savings_val, tasks)
     
@@ -162,7 +163,27 @@ class SavingsOperation(Operation):
         if self.waitlimit:
             desc += "WL(%d)" % self.waitlimit
         return desc
-         
+
+def greedy_val(task):
+    name, order = task         
+    from pygrout import VrptwSolution, VrptwTask, build_first
+    VrptwTask.sort_order = order    
+    sol = VrptwSolution(VrptwTask(name))
+    build_first(sol)
+    return sol.val()
+
+class GreedyOperation(Operation):
+    def __init__(self, args, order):
+        Operation.__init__(self, args)
+        self.order = order
+    
+    def get_iterator(self, worker):
+        tasks = zip(self.args, repeat(self.order))
+        return worker.p.imap(greedy_val, tasks)
+    
+    def get_name(self):
+        return self.order
+
 class Worker(QtCore.QThread):
     """An active object for background computations."""
     def __init__(self, helper, parent = None):
@@ -215,6 +236,7 @@ class Helper(QtGui.QDialog):
 
         QtCore.QObject.connect(self.ui.update, QtCore.SIGNAL("clicked()"), self.plot_savings)
         QtCore.QObject.connect(self.ui.best, QtCore.SIGNAL("clicked()"), self.plot_best)
+        QtCore.QObject.connect(self.ui.greedy, QtCore.SIGNAL("clicked()"), self.plot_greedy)
         QtCore.QObject.connect(self.ui.clearPlot, QtCore.SIGNAL("clicked()"), self.clear_plot)
     
     def lock_ui(self):
@@ -239,6 +261,10 @@ class Helper(QtGui.QDialog):
         mi = self.ui.mi.value()
         waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
         self.worker.performOperation(SavingsOperation(self.tests_chosen(), mi, waitlimit))
+        
+    def plot_greedy(self):
+        order = str(self.ui.greedyOrder.currentText())
+        self.worker.performOperation(GreedyOperation(self.tests_chosen(), order))
                 
     def clear_plot(self):
         """Slot for clearing the plot."""
