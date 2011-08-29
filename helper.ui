@@ -211,6 +211,13 @@
              </widget>
             </item>
             <item>
+             <widget class="QCheckBox" name="mfs">
+              <property name="text">
+               <string>mfs</string>
+              </property>
+             </widget>
+            </item>
+            <item>
              <widget class="QPushButton" name="update">
               <property name="text">
                <string>Plot</string>

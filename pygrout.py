@@ -179,17 +179,42 @@ def build_by_savings(sol, wait_limit = None, mi = 1):
 def build_by_mfsavings(sol, wait_limit = None, mi = 1):
     """Build by maybe faster savings heuristic implementation.
     Should actually provide the same results as 'normal' O(n**3) savings."""
-    prevs = [0] * (sol.N+1)
-    nexts = [0] * (sol.N+1)
-    route = range(sol.N+1)
+    print "Warning: using maybe faster savings..."
+    sol.reset()
+    for c in xrange(sol.task.N):
+        insert_new(sol, c+1)
+    prevs = [0] * (sol.task.N+1)
+    nexts = [0] * (sol.task.N+1)
+    route = [None]+sol.r
     possible = [ (mi*sol.d(i,j) - sol.d(0, i) - sol.d(j, 0), i, j) 
-    for i in xrange(1, sol.N+1)
-        for j in xrange(1, sol.N+1)
+    for i in xrange(1, sol.task.N+1)
+        for j in xrange(1, sol.task.N+1)
             if i <> j ]
     possible.sort()         
     # TODO: check validity and perform savings
     for sav, i, j in possible:
-        pass
+        if nexts[i] or prevs[j]:
+            continue
+        # TODO: check arrivals
+        xk, _, arr_xk, _ = route[i][R_EDG][-1]
+        _, y0, _, larr_y0 = route[j][R_EDG][0]
+        arr_y0 = arr_xk + sol.t(xk, y0)
+        wait_y0 = max(0, sol.a(y0) - arr_y0)
+        if (route[i][R_CAP]+route[j][R_CAP] > sol.task.capa
+            or arr_y0 > larr_y0 
+            or (wait_limit and wait_y0 > wait_limit) ):
+            continue
+        # join routes
+        print "Joining %d and %d, routes:" % (i, j), route[i], route[j]
+        prevs[j] = i
+        nexts[i] = j
+        # remember last customer, before joining
+        last_rj = route[j][R_EDG][-1][E_FRO]
+        join_routes_ref(sol, route[i], route[j])
+        # careful - this must come after joining
+        route[last_rj] = route[i]
+        print "result:", route[i]
+        sol.check()
     return sol
 
 def local_search(sol, oper, end=0, verb=False, speed=None):
@@ -841,6 +866,16 @@ def initials(args):
     build_first(sol)
     sol.save("_init")
 
+def mksol(name = 'c101'):
+    """Produce a solution with a task for the given name (shorthand)."""
+    import os.path
+    sol = None
+    for cand in [name, 'solomons/%s'%name, 'hombergers/%s'%name, 
+                 'solomons/%s.txt'%name, 'hombergers/%s.txt'%name]:
+        if os.path.exists(cand):
+            sol = VrptwSolution(VrptwTask(cand))
+    return sol
+    
 def get_argument_parser():
     """Create and configure an argument parser.
     Used by main function; may be used for programmatic access."""

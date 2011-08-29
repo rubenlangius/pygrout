@@ -342,6 +342,21 @@ class VrptwSolution(object):
     def infoline(self):
         return "(%d, %.2f) (%5.1f%%, %5.1f%%)" % (self.val()+self.percentage())
 
+def propagate_arrival_ref(sol, rr, pos):
+    edges = rr[R_EDG]
+    time = sol.task.time
+    cust = sol.task.cust
+    a, b, arr_a, _ = edges[pos]
+    for idx in xrange(pos+1, len(edges)):
+        b, _, old_arrival, _ = edges[idx]
+        new_arrival = max(arr_a + time[a][b], cust[b][A])
+        # check, if there is a modification
+        if new_arrival == old_arrival:
+            break
+        u.set(edges[idx], E_ARF, new_arrival)
+        a = b
+        arr_a = new_arrival
+
 def propagate_arrival(sol, r, pos):
     """Update arrivals (actual service begin) on a route after pos."""
     edges = sol.r[r][R_EDG]
@@ -357,6 +372,22 @@ def propagate_arrival(sol, r, pos):
         u.set(edges[idx], E_ARF, new_arrival)
         a = b
         arr_a = new_arrival
+
+def propagate_deadline_ref(sol, rr, pos):
+    """Update deadlines (latest legal service begin) on a route before pos."""
+    edges = rr[R_EDG]
+    _, b, _, larr_b = edges[pos]
+    time = sol.task.time
+    cust = sol.task.cust
+    for idx in xrange(pos-1, -1, -1):
+        _, a, _, old_deadline = edges[idx]
+        new_deadline = min(larr_b-time[a][b], cust[a][B])
+        # check, if there is a modification
+        if new_deadline == old_deadline:
+            break
+        u.set(edges[idx], E_LAT, new_deadline)
+        b = a
+        larr_b = new_deadline
 
 def propagate_deadline(sol, r, pos):
     """Update deadlines (latest legal service begin) on a route before pos."""
@@ -553,5 +584,22 @@ def join_routes(sol, r1, r2):
     propagate_deadline(sol, r1, pos)
     # print sol.r[r1][R_EDG]
     sol.r.pop(r2)
+    sol.k -= 1
+    sol.dist -= saving
+
+def join_routes_ref(sol, rr1, rr2):
+    c, _, arr_c, _ = rr1[R_EDG].pop()
+    _, d, _, larr_d = rr2[R_EDG].pop(0)
+    pos = rr1[R_LEN]-1
+    saving = sol.d(c, 0) + sol.d(0, d) - sol.d(c, d)
+    rr1[R_EDG].append([c, d, arr_c, larr_d])
+    rr1[R_EDG].extend(rr2[R_EDG])
+    rr1[R_LEN] += rr2[R_LEN]-1
+    rr1[R_CAP] += rr2[R_CAP]
+    rr1[R_DIS] += rr2[R_DIS] - saving
+    propagate_arrival_ref(sol, rr1, pos)
+    propagate_deadline_ref(sol, rr1, pos)
+    # print sol.r[r1][R_EDG]
+    sol.r.remove(rr2)
     sol.k -= 1
     sol.dist -= saving

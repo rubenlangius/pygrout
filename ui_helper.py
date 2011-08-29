@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'helper.ui'
 #
-# Created: Thu Aug 25 01:43:30 2011
+# Created: Mon Aug 29 16:54:25 2011
 #      by: PyQt4 UI code generator 4.8.3
 #
 # WARNING! All changes made in this file will be lost!
@@ -89,6 +89,9 @@ class Ui_Helper(object):
         self.waitlimit.setSingleStep(30)
         self.waitlimit.setObjectName(_fromUtf8("waitlimit"))
         self.horizontalLayout.addWidget(self.waitlimit)
+        self.mfs = QtGui.QCheckBox(self.groupBox)
+        self.mfs.setObjectName(_fromUtf8("mfs"))
+        self.horizontalLayout.addWidget(self.mfs)
         self.update = QtGui.QPushButton(self.groupBox)
         self.update.setObjectName(_fromUtf8("update"))
         self.horizontalLayout.addWidget(self.update)
@@ -165,6 +168,7 @@ class Ui_Helper(object):
         self.groupBox.setTitle(QtGui.QApplication.translate("Helper", "Savings heuristic", None, QtGui.QApplication.UnicodeUTF8))
         self.label.setText(QtGui.QApplication.translate("Helper", "µ param", None, QtGui.QApplication.UnicodeUTF8))
         self.has_waitlimit.setText(QtGui.QApplication.translate("Helper", "use waitlimit", None, QtGui.QApplication.UnicodeUTF8))
+        self.mfs.setText(QtGui.QApplication.translate("Helper", "mfs", None, QtGui.QApplication.UnicodeUTF8))
         self.update.setText(QtGui.QApplication.translate("Helper", "Plot", None, QtGui.QApplication.UnicodeUTF8))
         self.groupBox_3.setTitle(QtGui.QApplication.translate("Helper", "Greedy build first", None, QtGui.QApplication.UnicodeUTF8))
         self.greedy.setText(QtGui.QApplication.translate("Helper", "Plot", None, QtGui.QApplication.UnicodeUTF8))
