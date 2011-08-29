@@ -121,7 +121,7 @@ class Operation(object):
         
     def find_args(self, argstr):
         from glob import glob
-        return sorted(glob(argstr))
+        return sorted(glob(argstr), key=lambda x: x.replace('_', '0'))
 
     def get_name(self):
         """Description of operation, e.g. for plot label."""
@@ -148,18 +148,30 @@ def savings_val(task):
     build_by_savings(sol, waitlimit, mi)
     return sol.val()
 
+def mfsavings_val(task):
+    """The mapping function for savings heuristic."""
+    name, waitlimit, mi = task
+    from pygrout import VrptwSolution, VrptwTask, build_by_mfsavings    
+    print "Should process", name
+    sol = VrptwSolution(VrptwTask(name))
+    build_by_mfsavings(sol, waitlimit, mi)
+    return sol.val()
+
 class SavingsOperation(Operation):
-    def __init__(self, args, mi, waitlimit):
+    def __init__(self, args, mi, waitlimit, mfs=True):
         Operation.__init__(self, args)
         self.mi = mi
         self.waitlimit = waitlimit
+        self.mfs = mfs
     
     def get_iterator(self, worker):
         tasks = zip(self.args, repeat(self.waitlimit), repeat(self.mi))
+        if self.mfs:
+            return worker.p.imap(mfsavings_val, tasks)
         return worker.p.imap(savings_val, tasks)
     
     def get_name(self):
-        desc ="sav(%.1f)" % self.mi
+        desc =("mfs(%.1f)" if self.mfs else "sav(%.1f)") % self.mi
         if self.waitlimit:
             desc += "WL(%d)" % self.waitlimit
         return desc
@@ -260,7 +272,8 @@ class Helper(QtGui.QDialog):
     def plot_savings(self):
         mi = self.ui.mi.value()
         waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
-        self.worker.performOperation(SavingsOperation(self.tests_chosen(), mi, waitlimit))
+        mfs = self.ui.mfs.checkState()
+        self.worker.performOperation(SavingsOperation(self.tests_chosen(), mi, waitlimit, mfs))
         
     def plot_greedy(self):
         order = str(self.ui.greedyOrder.currentText())
