@@ -51,15 +51,18 @@ def solution_header(sol):
     result += "Total travel distance: %.3f\n" % sol.dist
     return result
     
-def print_like_Czarnas(sol):
+def print_like_Czarnas(sol, sparse=False):
     """Prints the solution in a form compatible (and diffable) with Czarnas."""
     result = solution_header(sol)
     
     for rt, num in zip(sol.r, count(1)):
-        result += "Route: %d, len: %d, dist: %.3f, max cap: %.2f" % (
+        if (not sparse) or rt[R_LEN] > 2:
+            result += "Route: %d, len: %d, dist: %.3f, max cap: %.2f" % (
                 num, rt[R_LEN], rt[R_DIS], rt[R_CAP])
-        result += ", route: "+"-".join(
+            result += ", route: "+"-".join(
                 str(e[E_FRO]) for e in rt[R_EDG][1:] )+"\n"
+    if sparse and any(rt[R_LEN]==2 for rt in sol.r):
+        result += "Single routes: " + ", ".join(str(rt[R_EDG][1][E_FRO]) for rt in sol.r if rt[R_LEN]==2)+"\n"
     print result
 
 def print_like_Czarnas_long(sol):
