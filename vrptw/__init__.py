@@ -221,10 +221,11 @@ class VrptwSolution(object):
             if not self.check_route(i, unserviced):
                 return False
         if len(unserviced) and complete:
-            error("Unserviced customers left: " + ", ".join(str(x) for x in sorted(unserviced)))
+            error("Unserviced customers left in %s: " % self.task.name + ", ".join(str(x) for x in sorted(unserviced)))
         total_dist = sum(self.r[i][R_DIS] for i in xrange(self.k))
         if abs(total_dist - self.dist) > 1e-3:
-            error("Wrong total dist: %f, while sum: %f" % (total_dist, self.dist))
+            error("Wrong total dist: %f, while sum: %f (%d routes for %s)" % (total_dist, self.dist, 
+                                                                              self.k, self.task.name))
             return False
         return True
     
@@ -236,7 +237,7 @@ class VrptwSolution(object):
         """Check route i for consistency. 
         Remove found customers from unserviced_"""
         now, dist, cap, l = 0, 0, 0, 0
-        unserviced = unserviced_ or set(range(1, self.task.N+1))
+        unserviced = unserviced_ if unserviced_ is not None else set(range(1, self.task.N+1))
         for fro, to, afro, lato in self.r[i][R_EDG]:
             actual = max(now, self.a(fro))
             if afro <> actual:
@@ -261,7 +262,7 @@ class VrptwSolution(object):
             error("Wrong length %d (actual %d) for route %d" % (self.r[i][R_LEN], l, i))
             return False
         if abs(dist - self.r[i][R_DIS]) > 1e-4:
-            error("Wrong total distance %f (actual %f) for route %d" % (self.r[i][R_DIS], dist, i))
+            error("Wrong distance %f (actual %f) for route %d" % (self.r[i][R_DIS], dist, i))
             return False
         return True
         

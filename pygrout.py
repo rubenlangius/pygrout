@@ -179,7 +179,6 @@ def build_by_savings(sol, wait_limit = None, mi = 1):
 def build_by_mfsavings(sol, wait_limit = None, mi = 1):
     """Build by maybe faster savings heuristic implementation.
     Should actually provide the same results as 'normal' O(n**3) savings."""
-    print "Warning: using maybe faster savings..."
     sol.reset()
     for c in xrange(sol.task.N):
         insert_new(sol, c+1)
@@ -193,9 +192,10 @@ def build_by_mfsavings(sol, wait_limit = None, mi = 1):
     possible.sort()         
     # TODO: check validity and perform savings
     for sav, i, j in possible:
-        if nexts[i] or prevs[j]:
+        # third condition: already joint (ends of the same route)
+        if nexts[i] or prevs[j] or route[i]==route[j]:
             continue
-        # TODO: check arrivals
+        #  check arrivals
         xk, _, arr_xk, _ = route[i][R_EDG][-1]
         _, y0, _, larr_y0 = route[j][R_EDG][0]
         arr_y0 = arr_xk + sol.t(xk, y0)
@@ -205,16 +205,21 @@ def build_by_mfsavings(sol, wait_limit = None, mi = 1):
             or (wait_limit and wait_y0 > wait_limit) ):
             continue
         # join routes
-        print "Joining %d and %d, routes:" % (i, j), route[i], route[j]
+        print "Joining %d and %d" % (i, j)
         prevs[j] = i
         nexts[i] = j
         # remember last customer, before joining
         last_rj = route[j][R_EDG][-1][E_FRO]
+        prevdist = sol.dist
         join_routes_ref(sol, route[i], route[j])
         # careful - this must come after joining
         route[last_rj] = route[i]
-        print "result:", route[i]
-        sol.check()
+        # print "result:\n", route[i]
+        # from compat import print_like_Czarnas
+        # print_like_Czarnas(sol, sparse=True)
+        # TURN ON IF NECCESSARY:
+        # sol.check_full()
+        
     return sol
 
 def local_search(sol, oper, end=0, verb=False, speed=None):
