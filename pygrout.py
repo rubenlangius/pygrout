@@ -170,6 +170,7 @@ def build_by_savings(sol, wait_limit = None, mi = 1):
             break
         sav, wt, r1, r2 = max(savings)
         # print 'saving', sav, 'by join of', r1, r2, 'wait', wt, 'in', sol.task.name
+        print "Joining %d and %d for %.1f saving." % (sol.r[r1][R_EDG][-1][E_FRO], sol.r[r2][R_EDG][0][E_TOW], sav)
         join_routes(sol, r1, r2)
         # turned off for efficiency (now assumed correct)
         # sol.check()
@@ -205,7 +206,7 @@ def build_by_mfsavings(sol, wait_limit = None, mi = 1):
             or (wait_limit and wait_y0 > wait_limit) ):
             continue
         # join routes
-        print "Joining %d and %d" % (i, j)
+        print "Joining %d and %d for %.1f saving." % (i, j, -sav)
         prevs[j] = i
         nexts[i] = j
         # remember last customer, before joining
