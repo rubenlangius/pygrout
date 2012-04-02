@@ -52,8 +52,8 @@ inline void load(std::string filename, Problem &p)
     f >> w >> w >> w; // VEHICLE NUMBER CAPACITY
     f >> vehicles;
     f >> p.capacity;
-    for(int i=0; i<12; ++i) f >> w;
-    p.customers.resize(4 * vehicles + 1);
+    for(int i=0; i<12; ++i) f >> w; // skip CUSTOMER ... SERVICE TIME
+    p.customers.resize(4 * vehicles + 1); // for S and H it's always 4*vehicles
     for(int i=0; i <= 4*vehicles; ++i)
         p.customers[i].load(f);
 }
@@ -78,11 +78,12 @@ Solution route_minimization(Problem &p)
 {
     Solution s;
     all_customers_as_routes(p, s);
+    return s;
 }
 
 void all_customers_as_routes(Problem &p, Solution &s)
 {
-    int n = p.customers.size();
+    int n = p.customers.size()-1;
     s.routes.resize(n);
     for(int i=0; i<n; ++i)
     {
@@ -92,3 +93,17 @@ void all_customers_as_routes(Problem &p, Solution &s)
 }
 
 }
+
+inline std::ostream& operator<<(std::ostream &out, const vrptw::Solution& s)
+{
+    for(int i=0; i<s.routes.size(); ++i)
+    {
+        for(int j=0; j<s.routes[i].size(); ++j)
+        {
+            out << s.routes[i][j].customer_id << '-';
+        }
+        out << "0\n";
+    }
+    return out;
+}
+
