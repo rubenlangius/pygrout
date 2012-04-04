@@ -16,9 +16,9 @@ struct Customer
     int ready_time;
     int due_date;
     int service_time;
+    int id;
     istream& load(istream& in)
     {
-        int id;
         in >> id >> x >> y >> demand >> ready_time >> due_date >> service_time;
         return in;
     }
@@ -60,16 +60,32 @@ inline void load(std::string filename, Problem &p)
 
 struct Service
 {
-    int customer_id;
+    Customer *customer;
     float start;
     float latest;
-    Service(int customer_id, float start, float latest) :
-        customer_id(customer_id), start(start), latest(latest) {}
+    Service(Customer *customer, float start, float latest) :
+        customer(customer), start(start), latest(latest) {}
+};
+
+typedef std::vector<Service> serviceVector;
+struct Route : public serviceVector
+{
+    int demand;
+    void clear()
+    {
+        serviceVector::clear();
+        demand = 0;
+    }
+    void push_back(const Service &s)
+    {
+        serviceVector::push_back(s);
+        demand += s.customer->demand;
+    }
 };
 
 struct Solution
 {
-    std::vector<std::vector<Service> > routes;
+    std::vector<Route> routes;
 };
 
 void all_customers_as_routes(Problem &p, Solution &s);
@@ -88,7 +104,7 @@ void all_customers_as_routes(Problem &p, Solution &s)
     for(int i=0; i<n; ++i)
     {
         s.routes[i].clear();
-        s.routes[i].push_back(Service(i+1, p.distance(0, i+1), p.customers[i+1].due_date));
+        s.routes[i].push_back(Service(&p.customers[i+1], p.distance(0, i+1), p.customers[i+1].due_date));
     }
 }
 
@@ -100,7 +116,7 @@ inline std::ostream& operator<<(std::ostream &out, const vrptw::Solution& s)
     {
         for(int j=0; j<s.routes[i].size(); ++j)
         {
-            out << s.routes[i][j].customer_id << '-';
+            out << s.routes[i][j].customer->id << '-';
         }
         out << "0\n";
     }
