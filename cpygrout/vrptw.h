@@ -1,3 +1,5 @@
+#ifndef VRPTW_H
+#define VRPTW_H
 
 #include <string>
 #include <vector>
@@ -123,3 +125,4 @@ inline std::ostream& operator<<(std::ostream &out, const vrptw::Solution& s)
     return out;
 }
 
+#endif
