@@ -89,6 +89,8 @@ struct Solution
 {
     std::vector<Route> routes;
 };
+typedef std::vector<Route>::iterator IRoute;
+
 
 void all_customers_as_routes(Problem &p, Solution &s);
 
