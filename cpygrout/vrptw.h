@@ -43,6 +43,14 @@ struct Problem
              customers[customer1].y-customers[customer2].y
         );
     }
+    float time(int customer1, int customer2)
+    {
+        return customers[customer1].service_time + distance(customer1, customer2);
+    }
+    float arrival_at_next(int c_from, float time_at, int c_to)
+    {
+       return std::max(time_at + time(c_from, c_to), (float)customers[c_to].ready_time);
+    }
 };
 
 inline void load(std::string filename, Problem &p)
