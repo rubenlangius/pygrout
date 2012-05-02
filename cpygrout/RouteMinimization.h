@@ -18,10 +18,10 @@ class RouteMinimization
 
     void initEjectionPool(int toRemove)
     {
-        int n = s.routes[toRemove].size();
+        int n = s.routes[toRemove].services.size();
         ejectionPool.resize(n);
         for(int i=0; i<n; ++i)
-            ejectionPool[i] = s.routes[toRemove][i].customer->id;
+            ejectionPool[i] = s.routes[toRemove].services[i].customer->id;
     }
     void insert_customer(const Insertion &insertion)
     {
@@ -42,9 +42,9 @@ public:
                 continue;
             int c_from = 0;
             float time_at = 0;
-            for(int i=0; i<r->size(); ++i)
+            for(int i=0; i<r->services.size(); ++i)
             {
-                const Customer * customer_to = (*r)[i].customer;
+                const Customer * customer_to = r->services[i].customer;
                 float possible_arrival = p->arrival_at_next(c_from, time_at, v_in);
                 if (possible_arrival <= v_in_due)
                 {
@@ -56,7 +56,7 @@ public:
                     }
                 }
                 c_from = customer_to->id;
-                time_at = (*r)[i].start;
+                time_at = r->services[i].start;
             }
         }
         if (Nb_in.empty())
