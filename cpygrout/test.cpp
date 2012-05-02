@@ -9,7 +9,7 @@
 int main()
 {
     vrptw::Problem p;
-    vrptw::load("../solomons/c101.txt", p);
+    p.load("../solomons/c101.txt");
     vrptw::RouteMinimization rm(p);
     rm.execute();
     std::cout << rm.getSolution();
