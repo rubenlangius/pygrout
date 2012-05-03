@@ -94,10 +94,14 @@ struct Route
     {
         services.clear();
         demand = customer->demand;
-        services.push_back(Service(
-            customer,
-            customer->problem->arrival_at_next(0, 0.0f, customer->id),
-            customer->problem->latest_arrival(customer->id, customer->problem->horizon, 0)));
+        Problem *p = customer->problem;
+
+        float arrive = p->arrival_at_next(0, 0.0f, customer->id);
+        float latest = p->latest_arrival(customer->id, p->horizon, 0);
+        services.push_back(Service(customer, arrive, latest));
+
+        float back_to_depot = p->arrival_at_next(customer->id, arrive, 0);
+        services.push_back(Service(&p->customers[0], back_to_depot, p->horizon));
     }
 };
 typedef std::vector<Service>::iterator IService;
@@ -133,9 +137,11 @@ inline std::ostream& operator<<(std::ostream &out, const vrptw::Solution& s)
     {
         for(vrptw::IcService is = r->services.begin(); is != r->services.end(); ++is)
         {
-            out << is->customer->id << "(" << is->start << "," << is->latest << ")-";
+            out << is->customer->id << "("
+                << (is->customer->ready_time==is->start ? "*" : "")
+                << is->start << "," << is->latest << ")-";
         }
-        out << "0(0," << p->horizon << ")\n";
+        out << "\n";
     }
     return out;
 }
