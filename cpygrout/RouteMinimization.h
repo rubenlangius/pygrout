@@ -13,19 +13,25 @@ class RouteMinimization
     struct Insertion
     {
         Route *r;
+        float arrival;
         int pos;
     };
 
     void initEjectionPool(int toRemove)
     {
-        int n = s.routes[toRemove].services.size();
+        int n = s.routes[toRemove].services.size() - 1;
         ejectionPool.resize(n);
         for(int i=0; i<n; ++i)
             ejectionPool[i] = s.routes[toRemove].services[i].customer->id;
     }
-    void insert_customer(const Insertion &insertion)
+    void insert_customer(const Insertion &ins, int v_in)
     {
-        // TODO: place him!
+        Service& next = ins.r->services[ins.pos];
+        float latest = p->latest_arrival(next.customer->id, next.latest, v_in);
+        ins.r->services.insert(
+                ins.r->services.begin() + ins.pos,
+                Service(&p->customers[v_in], ins.arrival, latest));
+        // TODO: update starts ahead, and latest's before v_in
     }
 public:
     RouteMinimization(Problem *p_) : p(p_) {}
@@ -51,7 +57,7 @@ public:
                     float next_arrival = p->arrival_at_next(v_in, possible_arrival, customer_to->id);
                     if (next_arrival <= customer_to->due_date)
                     {
-                        Insertion insertion = { &(*r), i };
+                        Insertion insertion = { &(*r), possible_arrival, i };
                         Nb_in.push_back(insertion);
                     }
                 }
@@ -61,6 +67,8 @@ public:
         }
         if (Nb_in.empty())
             return false;
+        int randomInsertion = RANDINT(Nb_in.size());
+        insert_customer(Nb_in[randomInsertion], v_in);
         return true;
     }
 
