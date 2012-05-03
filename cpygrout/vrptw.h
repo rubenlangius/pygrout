@@ -101,12 +101,14 @@ struct Route
     }
 };
 typedef std::vector<Service>::iterator IService;
+typedef std::vector<Service>::const_iterator IcService;
 
 struct Solution
 {
     std::vector<Route> routes;
 };
 typedef std::vector<Route>::iterator IRoute;
+typedef std::vector<Route>::const_iterator IcRoute;
 
 void all_customers_as_routes(Problem &p, Solution &s)
 {
@@ -122,13 +124,18 @@ void all_customers_as_routes(Problem &p, Solution &s)
 
 inline std::ostream& operator<<(std::ostream &out, const vrptw::Solution& s)
 {
-    for(int i=0; i<s.routes.size(); ++i)
+    if (s.routes.empty())
     {
-        for(int j=0; j<s.routes[i].services.size(); ++j)
+        return out << "(Empty solution)\n";
+    }
+    vrptw::Problem *p = s.routes[0].services[0].customer->problem;
+    for(vrptw::IcRoute r = s.routes.begin(); r != s.routes.end(); ++r)
+    {
+        for(vrptw::IcService is = r->services.begin(); is != r->services.end(); ++is)
         {
-            out << s.routes[i].services[j].customer->id << '-';
+            out << is->customer->id << "(" << is->start << "," << is->latest << ")-";
         }
-        out << "0\n";
+        out << "0(0," << p->horizon << ")\n";
     }
     return out;
 }
