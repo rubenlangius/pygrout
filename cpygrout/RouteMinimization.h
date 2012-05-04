@@ -27,10 +27,12 @@ class RouteMinimization
     void insert_customer(const Insertion &ins, int v_in)
     {
         Service& next = ins.r->services[ins.pos];
+        Customer *customer = &p->customers[v_in];
         float latest = p->latest_arrival(next.customer->id, next.latest, v_in);
         ins.r->services.insert(
                 ins.r->services.begin() + ins.pos,
-                Service(&p->customers[v_in], ins.arrival, latest));
+                Service(customer, ins.arrival, latest));
+        ins.r->demand += customer->demand;
         // TODO: update starts ahead, and latest's before v_in
     }
 public:

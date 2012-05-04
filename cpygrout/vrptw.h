@@ -135,6 +135,7 @@ inline std::ostream& operator<<(std::ostream &out, const vrptw::Solution& s)
     vrptw::Problem *p = s.routes[0].services[0].customer->problem;
     for(vrptw::IcRoute r = s.routes.begin(); r != s.routes.end(); ++r)
     {
+        out << "Route " << r - s.routes.begin() + 1 << " [" << r->demand << "]: ";
         for(vrptw::IcService is = r->services.begin(); is != r->services.end(); ++is)
         {
             out << is->customer->id << "("
