@@ -28,7 +28,7 @@ sort_keys = dict(
     by_opening_desc = lambda x: -x[A], # by start of TW
     by_closing_desc = lambda x: -x[B], # by end of TW
     by_midtime_desc = lambda x: -x[A]-x[B], # by middle of TW
-    by_weight_desc  = lambda x: -x[DEM], # by demand        
+    by_weight_desc  = lambda x: -x[DEM], # by demand
     by_timewin      = lambda x: x[B]-x[A], # ascending TW
     by_timewin_desc = lambda x: x[A]-x[B], # descending TW
     by_id           = lambda x: 0,         # unsorted
@@ -37,9 +37,9 @@ sort_keys = dict(
 
 class VrptwTask(object):
     """Data loader - holds data of a VRPTW Solomon-formatted test."""
-    
+
     sort_order = 'by_timewin'
-    
+
     def __init__(self, stream, precompute = True):
         if type(stream)==str: stream = open(stream)
         lines = stream.readlines()
@@ -54,7 +54,7 @@ class VrptwTask(object):
         if precompute:
             self.precompute()
         self.load_best()
-        
+
     def precompute(self):
         """Initialize or update computed members: distances and times."""
         # transpose customers, get Xs and Ys and SRVs
@@ -111,21 +111,21 @@ class VrptwTask(object):
                                  +self.name)
             if os.path.exists(os.path.join('bestknown', self.name+'.txt')):
                 raise
-            
+
     def bestval(self):
         """Return best value pair."""
         return (self.best_k, self.best_dist)
-    
+
 def error(msg):
     """A function to print or suppress errors."""
     print msg
-    
+
 class VrptwSolution(object):
     """A routes (lists of customer IDs) collection, basically."""
-    
+
     # default output directory for saved solutions
     outdir = os.path.join(os.path.dirname(__file__), '..', "output")
-        
+
     def __init__(self, task):
         """The task could be used to keep track of it."""
         self.task = task
@@ -141,28 +141,28 @@ class VrptwSolution(object):
         self.r = []
         self.dist = 0.
         self.k = 0
-        
+
     def loghist(self):
         """Put the current time and value into the history list."""
         self.history.append( [self.k, self.dist, time.time()-self.mem['t_start']] )
-                
+
     def val(self):
         """Return a tuple to represent the solution value; less is better."""
         return (self.k, self.dist)
-        
+
     def percentage(self):
         """Return a tuple of precentage of current solution vs best known."""
         if self.task.best_k:
             return (100.*self.k/self.task.best_k, 100.*self.dist/self.task.best_dist)
         return (100, 100)
-        
+
     def flatten(self):
         """Make a string representation of the solution for grout program."""
-        return "\n".join( 
+        return "\n".join(
             ["%d %f" % (self.k, self.dist)] +
             # E_TOW, i.e. edge targets
             [" ".join(str(e[1]) for e in rt[R_EDG]) for rt in self.r] + ['0\n'])
-    
+
     def inflate(self, data):
         """Decode and recalculate routes from a string by flatten()."""
         # forget everything now:
@@ -192,12 +192,12 @@ class VrptwSolution(object):
                 arr_a = max(arr_a+t[a][b], cust[b][A])
                 a = b
             # set latest arrivat to depot, for propagating later
-            edges[-1][3] = cust[0][B] 
+            edges[-1][3] = cust[0][B]
             self.r.append([ len(customers), load, dist, edges ])
             propagate_deadline(self, -1, len(customers)-1)
             dist_glob += dist
         self.dist = dist_glob
-                
+
     # Shorthands for access to task object.
     def d(self, a, b):
         return self.task.dist[a][b]
@@ -209,11 +209,11 @@ class VrptwSolution(object):
         return self.task.cust[c][B]
     def dem(self, c):
         return self.task.cust[c][DEM]
-        
+
     def route(self, i):
         """Render a short representation of route i."""
         return "-".join(str(e[0]) for e in self.r[i][R_EDG])
-        
+
     def check(self, complete=False):
         """Checks solution, possibly partial, for inconsistency."""
         unserviced = set(range(1, self.task.N+1))
@@ -224,17 +224,17 @@ class VrptwSolution(object):
             error("Unserviced customers left in %s: " % self.task.name + ", ".join(str(x) for x in sorted(unserviced)))
         total_dist = sum(self.r[i][R_DIS] for i in xrange(self.k))
         if abs(total_dist - self.dist) > 1e-3:
-            error("Wrong total dist: %f, while sum: %f (%d routes for %s)" % (total_dist, self.dist, 
+            error("Wrong total dist: %f, while sum: %f (%d routes for %s)" % (total_dist, self.dist,
                                                                               self.k, self.task.name))
             return False
         return True
-    
+
     def check_full(self):
         """Check full solution - shorthand method."""
         return self.check(True)
 
     def check_route(self, i, unserviced_ = None ):
-        """Check route i for consistency. 
+        """Check route i for consistency.
         Remove found customers from unserviced_"""
         now, dist, cap, l = 0, 0, 0, 0
         unserviced = unserviced_ if unserviced_ is not None else set(range(1, self.task.N+1))
@@ -242,7 +242,7 @@ class VrptwSolution(object):
             actual = max(now, self.a(fro))
             if afro <> actual:
                 error("Wrong time: %.2f (expected %.2f, err %.3f) on rt %d"
-                      " edge %d from %d to %d, a(from) %d" 
+                      " edge %d from %d to %d, a(from) %d"
                       % (afro, actual, actual-afro, i, l, fro, to, self.a(fro)))
                 error(self.route(i))
                 return False
@@ -265,21 +265,21 @@ class VrptwSolution(object):
             error("Wrong distance %f (actual %f) for route %d" % (self.r[i][R_DIS], dist, i))
             return False
         return True
-        
+
     def save(sol, extra=None):
         """Dump (pickle) the solution."""
         import uuid
         # handling unknown percentage (r207.50 and r208.50, actually)
         prec_k, prec_d = map(
-            lambda x: "%05.1f" % x if sol.task.best_k else 'x'*5, 
-            sol.percentage())  
+            lambda x: "%05.1f" % x if sol.task.best_k else 'x'*5,
+            sol.percentage())
         # time signature - minutes and seconds (too little?)
         time_sig = "%02d%02d" % divmod(int(time.time())%3600, 60)
         # additional markers
         if not extra is None: time_sig += str(extra)
         node_sig = hex(uuid.getnode())[-4:]
         save_name = "%s-%s-%s-%02d-%05.1f-%s-%s.p" % (
-                sol.task.name, prec_k, prec_d, sol.k, sol.dist, 
+                sol.task.name, prec_k, prec_d, sol.k, sol.dist,
                 sol.get_signature()[:8], time_sig)
         sol.mem['save_name'] = save_name
         sol.mem['save_time'] = time.time()
@@ -294,7 +294,7 @@ class VrptwSolution(object):
             name = sol.task.name,
             percentage = sol.percentage(),
             history = sol.history )
-            
+
         if not os.path.exists(sol.outdir):
             os.makedirs(sol.outdir)
         target_path = os.path.join(sol.outdir, save_name)
@@ -302,31 +302,31 @@ class VrptwSolution(object):
             print "File %s - such solution already exists" % target_path
         else:
             cPickle.dump(save_data, open(target_path, 'wb'))
-            
+
         # not writing the copy - use the export command
         # open(os.path.join(sol.outdir, save_name.replace('.p', '.vrp')), 'w').write(sol.flatten())
-        return sol     
-    
+        return sol
+
     def copy(self):
         """Return a copy the solution in a possibly cheap way."""
         clone = VrptwSolution(self.task)
         clone.assign(self)
         return clone
-    
+
     def assign(self, rvalue):
         """Assignment operator - copy essential features from another solution."""
         self.k = rvalue.k
         self.dist = rvalue.dist
         self.r = cPickle.loads(cPickle.dumps(rvalue.r, 2))
-        
+
     def get_essence(self):
         """Return the most interesting part of the solution - routes."""
         return (self.k, self.dist, self.r)
-    
+
     def set_essence(self, essence):
         """Set new routes and value: use with result of get_essence."""
         self.k, self.dist, self.r = essence
-        
+
     def get_successors(self):
         """Return an array of nodes' successors, 0 for depot."""
         data = [0] * (self.task.N+1)
@@ -334,12 +334,12 @@ class VrptwSolution(object):
             for a, b, _, _ in route[R_EDG][1:]:
                 data[a] = b
         return data
-    
+
     def get_signature(self):
         """Return a hex digest of the solution."""
         import hashlib
         return hashlib.md5("-".join(str(succ) for succ in self.get_successors())).hexdigest()
-        
+
     def infoline(self):
         return "(%d, %.2f) (%5.1f%%, %5.1f%%)" % (self.val()+self.percentage())
 
@@ -412,7 +412,7 @@ def insert_new(sol, c):
     """Inserts customer C on a new route."""
     new_route = [
         2,                # number of edges
-        sol.dem(c),       # demand on route 
+        sol.dem(c),       # demand on route
         sol.d(0,c)+sol.d(c,0), # distance there and back
         [
             [0, c,                         0, sol.b(c)], # depot -> c
@@ -472,8 +472,8 @@ def find_bestpos_on(sol, c, r):
         if  arr_c <= larr_c and arr_a <= larr_a:
             return (-(dist[a][c] + dist[c][b] - dist[a][b]), pos)
         return None, None
-        
-    # find the best edge 
+
+    # find the best edge
     return max(map(eval_edge, enumerate(sol.r[r][R_EDG])))
 
 def find_bestpos(sol, c):
@@ -511,7 +511,7 @@ def remove_customer(sol, r, pos):
     a, b, arr_a, larr_b = u.pop(edges, pos)
     d, c, arr_b, larr_c = u.pop(edges, pos)
     assert b == d, 'adjacent edges do not meet in one node'
-    
+
     if sol.r[r][R_LEN] == 2: # last customer - remove route
         rt = u.pop(sol.r, r)
         # solution route count decrease

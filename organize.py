@@ -38,7 +38,7 @@ def multibar(*args, **kwargs):
     results = []
     for arg in args:
         if type(arg) is tuple:
-            myleft, arg = arg  
+            myleft, arg = arg
             myleft = np.array(myleft) + offset
         elif not left is None:
             myleft = np.array(left) + offset
@@ -64,7 +64,7 @@ def split_groups(s):
     for g in "c2 r1 r2 rc1 rc2".split():
         s, _ = re.subn(r"\s%s"%g, "\n%s"%g, s, count=1)
     return s
-  
+
 def printf(set_):
     """Used to display a set, with count, sorted and textwrapped."""
     print "(%d)"%len(set_)
@@ -74,7 +74,7 @@ def printf(set_):
 
 def print_grouped(sum_of_all):
     """Output with printf, but Solomon and Homberger separately."""
-    
+
     # Junk suppressed:
     """
     print "All found results are:"
@@ -83,9 +83,9 @@ def print_grouped(sum_of_all):
     printf(sum_of_all.difference(
         sel_solomons(sum_of_all), sel_homberger(sum_of_all)))
     """
-    
+
     # helpers (maybe later global)
-    
+
     def sel_solomons(set_):
         """Select Solomon test names (only full 100 customer)."""
         return set(filter(re.compile('r?c?\d{3}$').match, set_))
@@ -93,12 +93,12 @@ def print_grouped(sum_of_all):
     def sel_homberger(set_):
         """Select Solomon test names (only full 100 customer)."""
         return set(filter(re.compile('r?c?[0-9_]{5}$').match, set_))
-    
+
     print "Full Solomon tests:"
     printf(sel_solomons(sum_of_all))
     print "Homberger tests:"
-    printf(sel_homberger(sum_of_all))    
-    
+    printf(sel_homberger(sum_of_all))
+
 def compare(*args):
     """Read in the passed files and display differences."""
     if len(args) < 2:
@@ -112,13 +112,13 @@ def compare(*args):
     print "Only in %s:" % args[1]
     print_grouped(secnd.difference(first))
     print "In both:"
-    print_grouped(first.intersection(secnd))    
-    
+    print_grouped(first.intersection(secnd))
+
 def union(*args):
     """Read in the passed files and display the union (set sum)."""
     if len(args) < 1:
         print "Provide at least two filenames to add together."
-        return        
+        return
     sets = map(read_as_set, args)
     sum_of_all = set.union(*sets)
     print_grouped(sum_of_all)
@@ -130,7 +130,7 @@ def raw_union(*args):
 def raw_intersection(*args):
     """Print the union of arguments, one per line, no bubblegum."""
     return "\n".join(sorted(set.intersection(*map(read_as_set, args))))
-    
+
 def intersection(*args):
     """Set intersection of one (two) or more files."""
     if len(args) < 1:
@@ -152,30 +152,30 @@ def progress(*args):
         else:
             print "\n ... Nothing new in %s:" % arg
         total.update(set_)
-    
+
 def missing(*args):
     """List problem sets which are missing from all the arguments."""
-    
+
     def gen_hombergers():
         """Set of all Homberger instance names."""
-        return set([ c+n+s+x 
-            for c in ['c','r','rc'] 
+        return set([ c+n+s+x
+            for c in ['c','r','rc']
             for n in ['1', '2']
-            for s in ['_2','_4','_6','_8','10'] 
+            for s in ['_2','_4','_6','_8','10']
             for x in (['_%d' % i for i in xrange(1,10)]+['10']) ])
-    
+
     def gen_solomons():
         """Set of all Solomon instance names."""
         stats = [
-            ('c1', 9), ('c2', 8), 
-            ('r1', 12), ('r2', 11), 
+            ('c1', 9), ('c2', 8),
+            ('r1', 12), ('r2', 11),
             ('rc1', 8), ('rc2', 8) ]
         return set([ '%s%02d' % (fam, num)
             for fam, count in stats
             for num in xrange(1, count+1) ])
-        
+
     sum_of_all = set.union(*map(read_as_set, args))
-    
+
     hombergers = gen_hombergers()
     print "Missing Homberger tests:"
     difference = hombergers.difference(sum_of_all)
@@ -183,7 +183,7 @@ def missing(*args):
         print "(ALL %d)" % len(hombergers)
     else:
         printf(difference)
-        
+
     solomons = gen_solomons()
     print "Missing Solomon tests:"
     difference = solomons.difference(sum_of_all)
@@ -192,11 +192,11 @@ def missing(*args):
     else:
         printf(difference)
 
-    
+
 def main():
     """Main function - clean up a typical /output (sub)directory."""
-    
-    # helpers 
+
+    # helpers
     def create_file(fn, set_):
         if not os.path.exists(fn):
             open(fn, 'w').write("\n".join(sorted(set_)))
@@ -207,15 +207,15 @@ def main():
                 printf(present.symmetric_difference(set_))
 
     # ensure directory for best results (k == 100%)
-    
+
     if not os.path.exists('100s') and os.path.basename(os.getcwd()) <> '100s':
         print "Creating directory 100s (best-k results)"
         os.makedirs('100s')
     else:
         print "Directory 100s already present"
-        
+
     # move best results to their directory (also their .vrp companions)
-    
+
     solved = re.compile('[^-]+-100.0-.*')
     sol_ok = filter(solved.match, glob.glob('*.*'))
     if len(sol_ok):
@@ -225,9 +225,9 @@ def main():
             os.rename(f, os.path.join('100s',f))
     else:
         print "No best-k results found here."
-    
+
     # ensure there is an up-to-date all_list.txt, read results
-    
+
     present = set(glob.glob('*.p'))
     if os.path.exists('all_list.txt'):
         files = read_as_set('all_list.txt')
@@ -240,21 +240,21 @@ def main():
         # there was no all_list.txt
         open('all_list.txt', 'w').write("\n".join(sorted(present)))
         files = present
-            
+
     # grouping of the results to different sets
 
     sets_bad = set(cutoff.sub('', f).lower() for f in files)
-    
-    # good sets are always in the 
-    
+
+    # good sets are always in the
+
     sets_good = set(cutoff.sub('', f.replace('100s/','')).lower()
                     for f in glob.glob("100s/*.p"))
     ##sets_sometimes = sets_bad.intersection(sets_good)
     sets_always = sets_good.difference(sets_bad)
     sets_never = sets_bad.difference(sets_good)
-    
+
     # print summaries (for every run)
-        
+
     print "\nBad results:"
     print_grouped(sets_bad)
     print "\nGood results:"
@@ -269,7 +269,7 @@ def main():
     printf(sets_always)
     """
     # remove junk - medium solutions (conditionally)
-    
+
     if len(present) > 2*len(sets_bad):
         if 'y' == raw_input('Delete medium solutions (y/N)?'):
             for i in sets_bad:
@@ -280,7 +280,7 @@ def main():
                     os.unlink(f)
 
     # create lists for bad, never and sometimes
-    
+
     create_file('never.txt', sets_never)
     create_file('bad.txt', sets_bad) # broadest
     ##create_file('sometimes.txt', sets_sometimes)
@@ -291,7 +291,7 @@ def main():
 
 def draw_map(colors = defaultdict((lambda: ('w', '/')))):
     """Plot tests (solutions) as squares in color with mpl"""
-    sol_counts = dict([('c1', 9), ('c2', 8), ('r1', 12), ('r2', 11), 
+    sol_counts = dict([('c1', 9), ('c2', 8), ('r1', 12), ('r2', 11),
                        ('rc1', 8), ('rc2', 8) ])
     from matplotlib.pyplot import subplot, show, bar, title
     from itertools import cycle
@@ -306,7 +306,7 @@ def draw_map(colors = defaultdict((lambda: ('w', '/')))):
         homb_numbers = ['_%d' % (n+1,) for n in xrange(9)]+['10']
         for size in "_2 _4 _6 _8 10".split():
             for j in xrange(10):
-                name = groups[i]+size+homb_numbers[j] 
+                name = groups[i]+size+homb_numbers[j]
                 print name, j, base, colors[name]
                 bar(j, 0.8, bottom=base, color=colors[name][0], hatch=colors[name][1])
             base += 2
@@ -357,7 +357,7 @@ def dist_map():
         else:
             data[r] = ('red', '')
     draw_map(data)
-    
+
 def get_best_results():
     """Load a dictionary with best known result tuples."""
     import vrptw
@@ -368,7 +368,7 @@ def get_best_results():
             test, k, dist = line.split()
             data[test.lower()] = (int(k), float(dist))
     return data
-        
+
 def deepmap(f, something):
     """Map a nested structure, keeping the layout."""
     if type(something) == list:
@@ -379,7 +379,7 @@ def deepmap(f, something):
         return dict([(k, deepmap(f, something[k])) for k in something])
     else:
         return f(something)
-        
+
 def enter_ipython(extra_locals = dict()):
     """Run IPython embedded shell with added locals.
     To debug a specific place in script just call:
@@ -392,7 +392,7 @@ def enter_ipython(extra_locals = dict()):
 def plot_excess_routes(*args):
     """Display a histogram of excess routes in solutions."""
     best = get_best_results()
-    
+
     def get_stats(path):
         stats = smallstat()
         mem = set()
@@ -411,7 +411,7 @@ def plot_excess_routes(*args):
                     # print d['name'], bk, ex
                     stats.inc(ex)
         return stats.data
-    
+
     if len(args) == 0:
         args = ['.']
     from pylab import show, xlabel, ylabel, title, xticks,hist
@@ -422,17 +422,17 @@ def plot_excess_routes(*args):
     cust_title = raw_input('Enter title (%s): '%std_title)
     title(cust_title if cust_title <> '' else std_title)
     locs, _ = xticks()
-    if locs[1] < 1: 
+    if locs[1] < 1:
         xticks(range(len(stats.data)))
     print locs
     show()
-        
-    
+
+
 # global list of functions
 from types import FunctionType
 funcs = filter(lambda k: type(globals()[k])==FunctionType, globals().keys())
 
-if __name__ == '__main__': 
+if __name__ == '__main__':
     # my well-known "call-function-from-argv" design pattern
     import sys
     if len(sys.argv) > 1 and sys.argv[1] in funcs:

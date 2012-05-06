@@ -7,7 +7,7 @@ import os
 def main():
     if len(sys.argv) == 1:
         print "\nUsage: %s profile_output [sort_order] [profile_output...]" % sys.argv[0]
-        print """ 
+        print """
         Where sort order may be: time (default), cumulative, ...
         (taken from documentation:)
 
@@ -21,7 +21,7 @@ def main():
         'name'          function name
         'nfl'           name/file/line
         'stdname'       standard name
-        'time'          internal time 
+        'time'          internal time
 """
         exit()
 
@@ -29,7 +29,7 @@ def main():
 
     order = 'time'
     files = filter(os.path.exists, sys.argv[1:])
-    
+
     extra = list(set(sys.argv[1:])-set(files))
     if len(extra) > 0:
         order = extra[0]
@@ -41,6 +41,6 @@ def main():
 
     num_rows = int(os.getenv('ROWS', '20'))
     s.sort_stats(order).print_stats(num_rows)
-    
+
 if __name__ == '__main__':
     main()

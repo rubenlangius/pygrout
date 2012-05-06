@@ -43,7 +43,7 @@ def sanitize(dta):
     dta = re.compile("<.*?>", re.DOTALL).sub('', dta)
     dta = re.sub('[^\d\n \.RC]+', ' ', dta)
     return dta
-    
+
 def get_hombergers_sintef():
     """Download best result for Hombergers tests from SINTEF site."""
     summary = []
@@ -57,7 +57,7 @@ def get_hombergers_sintef():
             summary.append(save(m))
         print "Downloaded %.1f KB in %.1f s (%.1f KB/s)" % (kb, s, kb/s)
     open('vrptw/bestknown/summary_H.txt', 'w').write("\n".join(sorted(summary,
-         key=lambda x: x.replace('_', '0')))) 
+         key=lambda x: x.replace('_', '0'))))
 
 def get_solomons():
     """Download best results for Solomons tests as published by himself."""
@@ -75,7 +75,7 @@ def get_solomons():
         s, kb = time.time()-start, len(data)/1024.0
         print "Downloaded %.1f KB in %.1f s (%.1f KB/s)" % (kb, s, kb/s)
     open('vrptw/bestknown/summary_S.txt', 'w').write("\n".join(sorted(summary,
-         key=lambda x: x.replace('_', '0')))) 
+         key=lambda x: x.replace('_', '0'))))
 
 if __name__ == '__main__':
     get_hombergers_sintef()

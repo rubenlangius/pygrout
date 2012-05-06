@@ -1,9 +1,9 @@
-#!/usr/bin/env python   
+#!/usr/bin/env python
 
 # may perhaps even work on systems without numpy
 try:
     import numpy
-except: 
+except:
     numpy = type('dummy', (object,), dict(float64=float))()
 
 from vrptw import VrptwTask
@@ -27,11 +27,11 @@ class DummyTask(VrptwTask):
 def test_savings():
     """Check the savings (Clarke, Wright) construction method."""
     from vrptw import VrptwSolution
-    sol = VrptwSolution(DummyTask())   
+    sol = VrptwSolution(DummyTask())
     from pygrout import build_by_savings
     build_by_savings(sol)
     assert sol.check()
-     
+
 def test_deepmap():
     """Check the utility for mapping nested lists and dictionaries."""
     from organize import deepmap
@@ -42,7 +42,7 @@ def test_deepmap():
     assert deepmap(str.upper, plain_dict)==dict(a='HI', b='THERE')
     nested = {'a': [0, 4, 16], 'b': [1, 9, 25]}
     assert deepmap(sqrt, nested)=={'a': [0., 2., 4.], 'b':[1., 3., 5.]}
-    
+
 def _rec_assert_simmilar(a, b):
     assert type(a)==type(b), 'wrong types: %s and %s' % (type(a), type(b))
     if type(a) == list or type(a)==tuple:
@@ -54,7 +54,7 @@ def _rec_assert_simmilar(a, b):
         assert abs(a-b) < 1e-4
     else:
         assert False, 'unexpected type: '+str(type(a))
-        
+
 def test_flattening():
     """Checks the format for interchange with other programs, like grout."""
     from pygrout import (VrptwSolution, VrptwTask, build_first,
@@ -74,8 +74,8 @@ def test_flattening():
     assert s2.flatten()==data1
     _rec_assert_simmilar(s1.get_essence(), s2.get_essence())
 
-# possible similar tests: test for assign, copy, 
-# {get,set}_essence of Solution. But these work already.    
+# possible similar tests: test for assign, copy,
+# {get,set}_essence of Solution. But these work already.
 
 def test_find_pos():
     """Check consistency of finding the best position in a route."""
@@ -106,12 +106,12 @@ def test_argmap():
     from glob import glob
     m = ArgMap()
     files = glob("solomons/r1*")
-    files.sort() 
+    files.sort()
     m.add(files)
     assert m(files[0]) == 1
     assert m.ticklabels == ['r101', 'r106']
     assert m.ticks == [1, 6]
-    
+
 # Test left out, reenable in case of trouble ;)
 def _test_initial_creation():
     """Unit test for creating solutions to all included benchmarks."""

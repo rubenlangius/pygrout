@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use('Qt4Agg')
 import pylab
 
-from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QTAgg as NavigationToolbar  
+from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QTAgg as NavigationToolbar
 from matplotlib.figure import Figure
 
 
@@ -18,10 +18,10 @@ from ui_helper import Ui_Helper
 
 class ArgMap(object):
     """A class for determining indexes of sets on the plot."""
-    
+
     def __init__(self):
         self.reset()
-        
+
     def reset(self):
         """Empty the mapping and counters. Also initialize."""
         self.d = {}
@@ -35,16 +35,16 @@ class ArgMap(object):
         if norm.find('01.') <> -1 or norm.find('06.') <> -1:
             self.ticks.append(self.d[el])
             self.ticklabels.append(el[el.index('/')+1:el.index('.')])
-        
+
     def addOne(self, el):
         """Single unckecked additon (use __call__ to add safely)."""
         self.n = self.d[el] = self.n+1
         self.checkTick(el)
-        
+
     def add(self, els):
         """Adding multiple elements from an iterable."""
         map(self, els)
-        
+
     def __call__(self, el):
         """Calling the object does safe mapping of element to index."""
         if el not in self.d:
@@ -66,12 +66,12 @@ class Plot(object):
         self.argmap = ArgMap()
         self._setup_plots()
         self._update_ticks()
-    
-    def _setup_plots(self):        
+
+    def _setup_plots(self):
         self.ax_k.set_ylabel('route count')
         self.ax_d.set_ylabel('total distance')
 
-    def _update_ticks(self):        
+    def _update_ticks(self):
         self.ax_k.set_xlim((0, self.argmap.n+1))
         self.ax_k.set_xticks(self.argmap.ticks)
         self.ax_k.set_xticklabels(self.argmap.ticklabels)
@@ -82,7 +82,7 @@ class Plot(object):
     def attachTo(self, layout):
         layout.addWidget(self.canvas)
         layout.addWidget(self.toolbar)
-        
+
     def reset(self):
         """Remove plotted data from the drawing area."""
         self.argmap.reset()
@@ -91,24 +91,24 @@ class Plot(object):
         self._setup_plots()
         self._update_ticks()
         self.canvas.draw()
-        
+
     def display(self, operation):
         xcoords = map(self.argmap, operation.args)
         lbl = operation.get_name()
         self.ax_k.plot(xcoords, operation.ks, 'o', label=lbl)
         self.ax_k.legend()
         ymin, ymax = self.ax_k.get_ylim()
-        self.ax_k.set_ylim((ymin-1, ymax+1)) 
-        
+        self.ax_k.set_ylim((ymin-1, ymax+1))
+
         self.ax_d.plot(xcoords, operation.ds, '.', label=lbl)
         self.ax_d.legend()
         ymin, ymax = self.ax_d.get_ylim()
         spread = (ymax - ymin)*.03
-        self.ax_d.set_ylim((ymin-spread, ymax+spread)) 
-        
+        self.ax_d.set_ylim((ymin-spread, ymax+spread))
+
         self._update_ticks()
         self.canvas.draw()
-                
+
 class Operation(object):
     """An abstract operation for the sets to perform"""
     def __init__(self, args):
@@ -118,7 +118,7 @@ class Operation(object):
             self.args = args
         self.ks = []
         self.ds = []
-        
+
     def find_args(self, argstr):
         from glob import glob
         return sorted(glob(argstr), key=lambda x: x.replace('_', '0'))
@@ -142,7 +142,7 @@ class BestOperation(Operation):
 def savings_val(task):
     """The mapping function for savings heuristic."""
     name, waitlimit, mi = task
-    from pygrout import VrptwSolution, VrptwTask, build_by_savings    
+    from pygrout import VrptwSolution, VrptwTask, build_by_savings
     print "Should process", name
     sol = VrptwSolution(VrptwTask(name))
     build_by_savings(sol, waitlimit, mi)
@@ -151,7 +151,7 @@ def savings_val(task):
 def mfsavings_val(task):
     """The mapping function for savings heuristic."""
     name, waitlimit, mi = task
-    from pygrout import VrptwSolution, VrptwTask, build_by_mfsavings    
+    from pygrout import VrptwSolution, VrptwTask, build_by_mfsavings
     print "Should process", name
     sol = VrptwSolution(VrptwTask(name))
     build_by_mfsavings(sol, waitlimit, mi)
@@ -163,13 +163,13 @@ class SavingsOperation(Operation):
         self.mi = mi
         self.waitlimit = waitlimit
         self.mfs = mfs
-    
+
     def get_iterator(self, worker):
         tasks = zip(self.args, repeat(self.waitlimit), repeat(self.mi))
         if self.mfs:
             return worker.p.imap(mfsavings_val, tasks)
         return worker.p.imap(savings_val, tasks)
-    
+
     def get_name(self):
         desc =("mfs(%.1f)" if self.mfs else "sav(%.1f)") % self.mi
         if self.waitlimit:
@@ -177,9 +177,9 @@ class SavingsOperation(Operation):
         return desc
 
 def greedy_val(task):
-    name, order = task         
+    name, order = task
     from pygrout import VrptwSolution, VrptwTask, build_first
-    VrptwTask.sort_order = order    
+    VrptwTask.sort_order = order
     sol = VrptwSolution(VrptwTask(name))
     build_first(sol)
     return sol.val()
@@ -188,11 +188,11 @@ class GreedyOperation(Operation):
     def __init__(self, args, order):
         Operation.__init__(self, args)
         self.order = order
-    
+
     def get_iterator(self, worker):
         tasks = zip(self.args, repeat(self.order))
         return worker.p.imap(greedy_val, tasks)
-    
+
     def get_name(self):
         return self.order
 
@@ -212,7 +212,7 @@ class Worker(QtCore.QThread):
         # a single pool for processing
         from multiprocessing import Pool
         self.p = Pool()
-                
+
     def run(self):
         if not self.currentOp:
             return
@@ -224,12 +224,12 @@ class Worker(QtCore.QThread):
             numDone += 1
             self.emit(QtCore.SIGNAL('progress(int)'), numDone)
         self.helper.plot.display(self.currentOp)
-        
+
     def performOperation(self, operation):
         self.currentOp = operation
         self.helper.lock_ui()
         self.start()
-        
+
 class Helper(QtGui.QDialog):
     def __init__(self, parent=None):
         # boilerplate
@@ -250,39 +250,39 @@ class Helper(QtGui.QDialog):
         QtCore.QObject.connect(self.ui.best, QtCore.SIGNAL("clicked()"), self.plot_best)
         QtCore.QObject.connect(self.ui.greedy, QtCore.SIGNAL("clicked()"), self.plot_greedy)
         QtCore.QObject.connect(self.ui.clearPlot, QtCore.SIGNAL("clicked()"), self.clear_plot)
-    
+
     def lock_ui(self):
         """Called before entering the background operation."""
         from stopwatch import StopWatch
         self.watch = StopWatch()
         self.ui.update.setEnabled(False)
         self.ui.best.setEnabled(False)
-                
+
     def background_done(self):
         """Slot to unlock some UI elements after finished background operation."""
         self.ui.update.setEnabled(True)
         self.ui.best.setEnabled(True)
         self.ui.progressBar.setEnabled(False)
-        self.ui.textEdit.append("Processing finished in %s seconds" % self.watch) 
+        self.ui.textEdit.append("Processing finished in %s seconds" % self.watch)
         print "What now?", self.watch
-        
+
     def plot_best(self):
         self.worker.performOperation(BestOperation(self.tests_chosen()))
-            
+
     def plot_savings(self):
         mi = self.ui.mi.value()
         waitlimit = self.ui.waitlimit.value() if self.ui.has_waitlimit.checkState() else None
         mfs = self.ui.mfs.checkState()
         self.worker.performOperation(SavingsOperation(self.tests_chosen(), mi, waitlimit, mfs))
-        
+
     def plot_greedy(self):
         order = str(self.ui.greedyOrder.currentText())
         self.worker.performOperation(GreedyOperation(self.tests_chosen(), order))
-                
+
     def clear_plot(self):
         """Slot for clearing the plot."""
         self.plot.reset()
-        
+
     def init_progress(self, maxProgress):
         """Slot for resetting the progress bar's value to 0 with a new maximum."""
         self.ui.progressBar.setEnabled(True)
@@ -293,15 +293,15 @@ class Helper(QtGui.QDialog):
         """Slot for updating the progress bar."""
         print "--- one done ---"
         self.ui.progressBar.setValue(progress)
-        
+
     def tests_chosen(self):
         """Return the selected pattern in the families list."""
         return str(self.ui.families.currentItem().text())
-        
+
 
 if __name__ == "__main__":
     app = QtGui.QApplication(sys.argv)
-    # almost standard:    
+    # almost standard:
     helper = Helper()
     helper.show()
     sys.exit(app.exec_())
