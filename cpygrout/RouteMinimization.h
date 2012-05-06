@@ -95,9 +95,15 @@ public:
         insert_customer(Nb_in[randomInsertion], v_in);
         return true;
     }
+    
+    bool squeeze(int v_in)
+    {
+        return false;
+    }
 
     bool removeRoute()
     {
+        Solution backup(s);
         int toRemove = RANDINT(s.routes.size());
         initEjectionPool(toRemove);
         s.routes.erase(s.routes.begin()+toRemove);
@@ -108,8 +114,14 @@ public:
             {
                 ejectionPool.pop_back();
             }
+            else if (squeeze(v_in))
+            {
+                ejectionPool.pop_back();
+            }
             else
             {
+                // TODO: eject-insert
+                s = backup;
                 return false;
             }
         }
