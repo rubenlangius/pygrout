@@ -101,15 +101,19 @@ public:
         int toRemove = RANDINT(s.routes.size());
         initEjectionPool(toRemove);
         s.routes.erase(s.routes.begin()+toRemove);
-        int v_in = ejectionPool.back();
-        if (insert(v_in))
+        while (!ejectionPool.empty())
         {
-            ejectionPool.pop_back();
+            int v_in = ejectionPool.back();
+            if (insert(v_in))
+            {
+                ejectionPool.pop_back();
+            }
+            else
+            {
+                return false;
+            }
         }
-        else
-        {
-        }
-        return false;
+        return true;
     }
     void execute()
     {
@@ -118,9 +122,14 @@ public:
         do
         {
             success = removeRoute();
-        } while (success);
+        } while (success);        
     }
     Solution getSolution() { return s; }
+    template<class Iterator>
+    void ejectionPoolExport(Iterator out)
+    {
+        std::copy(ejectionPool.begin(), ejectionPool.end(), out);
+    }
 };
 
 }
