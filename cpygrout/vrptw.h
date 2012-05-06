@@ -106,6 +106,7 @@ struct Route
 };
 typedef std::vector<Service>::iterator IService;
 typedef std::vector<Service>::const_iterator IcService;
+typedef std::vector<Service>::reverse_iterator IrService;
 
 struct Solution
 {

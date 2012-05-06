@@ -24,16 +24,38 @@ class RouteMinimization
         for(int i=0; i<n; ++i)
             ejectionPool[i] = s.routes[toRemove].services[i].customer->id;
     }
+    
     void insert_customer(const Insertion &ins, int v_in)
     {
         Service& next = ins.r->services[ins.pos];
         Customer *customer = &p->customers[v_in];
         float latest = p->latest_arrival(next.customer->id, next.latest, v_in);
-        ins.r->services.insert(
+        IService fwd = ins.r->services.insert(
                 ins.r->services.begin() + ins.pos,
                 Service(customer, ins.arrival, latest));
+	IService end_(ins.r->services.end());
+        // demand
         ins.r->demand += customer->demand;
-        // TODO: update starts ahead, and latest's before v_in
+        // time windows
+        int c_from = v_in;
+        float last_arrival = ins.arrival;
+        for (++fwd; fwd != end_; ++fwd)
+        {
+            float arrival = p->arrival_at_next(c_from, last_arrival, fwd->customer->id);
+            if (arrival == fwd->start)
+                break;
+            last_arrival = fwd->start = arrival;
+            c_from = fwd->customer->id;            
+        }
+        int c_to = v_in;
+        for(IrService back(fwd), rend(ins.r->services.rend()); back != rend; ++back)
+        {            
+            float new_latest = p->latest_arrival(back->customer->id, latest, c_to);
+            if (new_latest == back->latest)
+                break;
+            back->latest = latest = new_latest;
+            c_to = back->customer->id;
+        }
     }
 public:
     RouteMinimization(Problem *p_) : p(p_) {}
