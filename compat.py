@@ -23,10 +23,10 @@ def d(s):
 def dd(s):
     """Debug print, no sleep."""
     print s
-    
+
 def solution_header(sol):
-    """   
-    The Czarnas' code features a 'routeCostMultipiler', which is used like this: 
+    """
+    The Czarnas' code features a 'routeCostMultipiler', which is used like this:
     (Solution.h)
     routeCostMultiplier = ROUTE_COST_WEIGHT * MAX_CUSTOMERS;
     FLOAT result = routeCostMultiplier * routes + TO_FLOAT(totalDistance);
@@ -50,11 +50,11 @@ def solution_header(sol):
     result += "Vehicle capacity: %.2f\nSolution value: %.3f\n" % (sol.task.capa, value)
     result += "Total travel distance: %.3f\n" % sol.dist
     return result
-    
+
 def print_like_Czarnas(sol, sparse=False):
     """Prints the solution in a form compatible (and diffable) with Czarnas."""
     result = solution_header(sol)
-    
+
     for rt, num in zip(sol.r, count(1)):
         if (not sparse) or rt[R_LEN] > 2:
             result += "Route: %d, len: %d, dist: %.3f, max cap: %.2f" % (
@@ -85,7 +85,7 @@ def print_like_Czarnas_long(sol):
             }
     """
     result = solution_header(sol)
-    
+
     for rt, num in zip(sol.r, count(1)):
         result += (
             "Route: %d\nRoute length: %d\nRoute cost: %.3f\n"
@@ -97,7 +97,7 @@ def print_like_Czarnas_long(sol):
             )
         wgt = 0
         for bef, aft in pairs(rt[R_EDG]):
-            cust = bef[E_TOW] 
+            cust = bef[E_TOW]
             result += (
                 "(%2d, %7.2f, %7.2f, %7.2f, %7.2f, %5.2f, %6.2f, %6.2f, %4.1f)\n" %
                  ( cust, aft[E_ARF], bef[E_LAT], sol.a(cust), sol.b(cust),
@@ -116,7 +116,7 @@ def symbol(i):
         (None, lambda x: '?') ]:
         if i >= t:
             return f(i)
-    
+
 def describe(sol, cols=50, onlyrouted=True):
     """Produces a textual representation of the task."""
     customers = [ sol.task.cust[c] for c in

@@ -17,9 +17,9 @@ def undo_add(list_, idx, val):
 
 def undo_ada(obj, atr, val):
     setattr(obj, atr, getattr(obj, atr) - val)
-    
+
 # undo elements type:
-# 
+#
 U_ELEM_IN, U_ELEM_OUT, U_ELEM_MOD, U_ATTRIB, U_ADD, U_ADA, U_CHECKPOINT = range(7)
 
 # undo mapping
@@ -48,13 +48,13 @@ class UndoStack(object):
         self.actions.append( (U_ELEM_MOD, (list_, idx, list_[idx])) )
         list_[idx] = value
         return value
-    
+
     def checkpoint(self):
         """Marks current state and returns the marker."""
         self.point += 1
         self.actions.append( (U_CHECKPOINT, self.point) )
         return self.point
-    
+
     def atr(self, obj, atr, val):
         """Change an object's attribute."""
         data = getattr(obj, atr)
@@ -86,17 +86,17 @@ class UndoStack(object):
             tag, args = self.actions.pop()
             if tag == U_CHECKPOINT:
                 if args == checkpoint:
-                    self.point = checkpoint-1 
+                    self.point = checkpoint-1
                     break
             else:
                 # print tag, args
                 handlers[tag](*args)
-                
+
     def undo_last(self):
         """Rollback actions to last checkpoint."""
         assert self.point > 0, 'No actions to undo'
         self.undo(self.point)
-        
+
 class TestUndoStack(object):
     """Unit test class for py.test"""
     def setup_class(self):
@@ -104,11 +104,11 @@ class TestUndoStack(object):
         self.u = UndoStack()
         self.l_orig = [7, 'dolorem', 4, None, 5.3]
         self.l = self.l_orig[:]
-        
+
     def setup_method(self, method):
         """Restore the example list, not needed if tests pass, undo does it."""
         # self.l = self.l_orig[:]
-                
+
     def test_ins(self):
         """Undoing an insertion."""
         self.u.ins(self.l, 0, 2)
@@ -116,13 +116,13 @@ class TestUndoStack(object):
         assert self.l == expected
         self.u.undo()
         assert self.l == self.l_orig
-            
+
     def test_pop(self):
         out = self.u.pop(self.l, 2)
         assert out == 4
         self.u.undo()
         assert self.l == self.l_orig
-        
+
     def test_set(self):
         self.u.set(self.l, 1, 'ipsum')
         assert self.l[1] == 'ipsum'
@@ -140,7 +140,7 @@ class TestUndoStack(object):
         assert l_on_check == self.l
         self.u.undo()
         assert self.l == self.l_orig
-        
+
     def test_atr(self):
         self.color = 'red'
         self.u.atr(self, 'color', 'blue')
