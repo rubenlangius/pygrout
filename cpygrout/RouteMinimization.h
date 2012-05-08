@@ -1,6 +1,8 @@
 #include "vrptw.h"
 #include "rng.h"
 
+#include <float.h>
+
 namespace vrptw
 {
 
@@ -9,6 +11,10 @@ class RouteMinimization
     Solution s;
     Problem *p;
     std::vector<int> ejectionPool;
+
+    float penalty_alpha;
+    static const float penalty_alpha_dec = 0.99f;
+    static const float penalty_alpha_inc = 1.0f/0.99f;
 
     struct Insertion
     {
@@ -24,7 +30,7 @@ class RouteMinimization
         for(int i=0; i<n; ++i)
             ejectionPool[i] = s.routes[toRemove].services[i].customer->id;
     }
-    
+
     void insert_customer(const Insertion &ins, int v_in)
     {
         Service& next = ins.r->services[ins.pos];
@@ -33,7 +39,7 @@ class RouteMinimization
         IService fwd = ins.r->services.insert(
                 ins.r->services.begin() + ins.pos,
                 Service(customer, ins.arrival, latest));
-	IService end_(ins.r->services.end());
+        IService end_(ins.r->services.end());
         // demand
         ins.r->demand += customer->demand;
         // time windows
@@ -45,11 +51,11 @@ class RouteMinimization
             if (arrival == fwd->start)
                 break;
             last_arrival = fwd->start = arrival;
-            c_from = fwd->customer->id;            
+            c_from = fwd->customer->id;
         }
         int c_to = v_in;
         for(IrService back(fwd), rend(ins.r->services.rend()); back != rend; ++back)
-        {            
+        {
             float new_latest = p->latest_arrival(back->customer->id, latest, c_to);
             if (new_latest == back->latest)
                 break;
@@ -58,8 +64,8 @@ class RouteMinimization
         }
     }
 public:
-    RouteMinimization(Problem *p_) : p(p_) {}
-    RouteMinimization(Problem &p_) : p(&p_) {}
+    RouteMinimization(Problem *p_) : p(p_), penalty_alpha(1.0) {}
+    RouteMinimization(Problem &p_) : p(&p_), penalty_alpha(1.0) {}
 
     bool insert(int v_in)
     {
@@ -95,9 +101,19 @@ public:
         insert_customer(Nb_in[randomInsertion], v_in);
         return true;
     }
-    
+
     bool squeeze(int v_in)
     {
+        float min_pc, min_ptw, min_fp = FLT_MAX;
+        int customer_demand = p->customers[v_in].demand;
+        for (IRoute r = s.routes.begin(); r!=s.routes.end(); ++r)
+        {
+            float demand_penalty = r->demand;
+            for (IService is=r->services.begin(); is != r->services.end(); ++is)
+            {
+                // TODO: calculate penalties, etc.
+            }
+        }
         return false;
     }
 
@@ -134,7 +150,7 @@ public:
         do
         {
             success = removeRoute();
-        } while (success);        
+        } while (success);
     }
     Solution getSolution() { return s; }
     template<class Iterator>
