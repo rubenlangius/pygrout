@@ -12,16 +12,61 @@ class RouteMinimization
     Problem *p;
     std::vector<int> ejectionPool;
 
-    float penalty_alpha;
-    static const float penalty_alpha_dec = 0.99f;
-    static const float penalty_alpha_inc = 1.0f/0.99f;
-
     struct Insertion
     {
         Route *r;
         float arrival;
         int pos;
     };
+
+    struct SqueezeInsertion : public Insertion
+    {
+        float demand_penalty;
+        float timewin_penalty;
+        float total_penalty;
+        SqueezeInsertion() : total_penalty(FLT_MAX) {}
+        SqueezeInsertion(Route *r_, float arrival_, int pos_, float demand_penalty_, float timewin_penalty_) :
+            demand_penalty(demand_penalty_), timewin_penalty(timewin_penalty_)
+        {
+            r = r_;
+            arrival = arrival_;
+            pos = pos_;
+        }
+    };
+
+    class SqueezeInserter
+    {
+        // const float alpha_decr = 0.99f;
+        float alpha;
+        Problem *p;
+    public:
+        SqueezeInsertion check_before(IRoute r, IService is, int v_in)
+        {
+            int c_from = 0;
+            float arrival_c_from = 0;
+            if (is == r->services.begin())
+            {
+                IService prev(is);
+                --prev;
+                c_from = prev->customer->id;
+                arrival_c_from = prev->start;
+            }
+            float arrival_v_in = p->arrival_at_next(c_from, arrival_c_from, v_in);
+            float demand_penalty = std::max(0, p->capacity - r->demand - p->customers[v_in].demand);
+            float timewin_penalty = std::max(0.0f, p->customers[v_in].due_date - arrival_v_in);
+            SqueezeInsertion result(&(*r), arrival_v_in, is - r->services.begin(), demand_penalty, timewin_penalty);
+            float arrival_prev = arrival_v_in;
+            c_from = v_in;
+            IService end(r->services.end());
+            for(IService is2 = is; is2 != end; ++is2)
+            {
+                ; // TODO: count tw penalties
+            }
+            result.total_penalty = alpha * result.timewin_penalty + demand_penalty;
+            return result;
+        }
+        SqueezeInserter(Problem *p_) : p(p_), alpha(1.0f) {}
+    } squeezeInserter;
 
     void initEjectionPool(int toRemove)
     {
@@ -64,8 +109,8 @@ class RouteMinimization
         }
     }
 public:
-    RouteMinimization(Problem *p_) : p(p_), penalty_alpha(1.0) {}
-    RouteMinimization(Problem &p_) : p(&p_), penalty_alpha(1.0) {}
+    RouteMinimization(Problem *p_) : p(p_),  squeezeInserter(p_)  {}
+    RouteMinimization(Problem &p_) : p(&p_), squeezeInserter(&p_) {}
 
     bool insert(int v_in)
     {
@@ -109,9 +154,12 @@ public:
         for (IRoute r = s.routes.begin(); r!=s.routes.end(); ++r)
         {
             float demand_penalty = r->demand;
-            for (IService is=r->services.begin(); is != r->services.end(); ++is)
+            int c_from = 0;
+            float arrival = 0;
+            IService r_end = r->services.end();
+            for (IService is=r->services.begin(); is != r_end; ++is)
             {
-                // TODO: calculate penalties, etc.
+                SqueezeInsertion ins = squeezeInserter.check_before(r, is, v_in);
             }
         }
         return false;
