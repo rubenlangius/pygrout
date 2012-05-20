@@ -60,7 +60,14 @@ class RouteMinimization
             IService end(r->services.end());
             for(IService is2 = is; is2 != end; ++is2)
             {
-                ; // TODO: count tw penalties
+                int c_to = is2->customer->id;
+                float arrival = p->arrival_at_next(c_from, arrival_prev, c_to);
+                if (arrival < is2->latest)
+                    break;
+                if (arrival > is2->customer->due_date)
+                    result.timewin_penalty += is2->customer->due_date - arrival;
+                c_from = c_to;
+                arrival_prev = arrival;
             }
             result.total_penalty = alpha * result.timewin_penalty + demand_penalty;
             return result;
@@ -149,7 +156,7 @@ public:
 
     bool squeeze(int v_in)
     {
-        float min_pc, min_ptw, min_fp = FLT_MAX;
+        SqueezeInsertion best;
         int customer_demand = p->customers[v_in].demand;
         for (IRoute r = s.routes.begin(); r!=s.routes.end(); ++r)
         {
@@ -160,8 +167,11 @@ public:
             for (IService is=r->services.begin(); is != r_end; ++is)
             {
                 SqueezeInsertion ins = squeezeInserter.check_before(r, is, v_in);
+                if (ins.total_penalty < best.total_penalty)
+                    best = ins;
             }
         }
+        // TODO: insert best
         return false;
     }
 
