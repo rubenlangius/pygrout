@@ -2,6 +2,7 @@
 #include "rng.h"
 
 #include <float.h>
+#include <iostream>
 
 namespace vrptw
 {
@@ -32,6 +33,10 @@ class RouteMinimization
             arrival = arrival_;
             pos = pos_;
         }
+        friend std::ostream& operator<<(std::ostream& out, const SqueezeInsertion& rhs)
+        {
+            return out << rhs.total_penalty << ", on route " << rhs.r << ", pos " << rhs.pos;
+        }
     };
 
     class SqueezeInserter
@@ -44,7 +49,7 @@ class RouteMinimization
         {
             int c_from = 0;
             float arrival_c_from = 0;
-            if (is == r->services.begin())
+            if (is != r->services.begin())
             {
                 IService prev(is);
                 --prev;
@@ -65,7 +70,7 @@ class RouteMinimization
                 if (arrival < is2->latest)
                     break;
                 if (arrival > is2->customer->due_date)
-                    result.timewin_penalty += is2->customer->due_date - arrival;
+                    result.timewin_penalty += arrival - is2->customer->due_date;
                 c_from = c_to;
                 arrival_prev = arrival;
             }
@@ -172,6 +177,7 @@ public:
             }
         }
         // TODO: insert best
+        std::cout << "Best insertion: " << best << std::endl;
         return false;
     }
 
@@ -195,7 +201,7 @@ public:
             else
             {
                 // TODO: eject-insert
-                s = backup;
+                // s = backup;
                 return false;
             }
         }
@@ -210,7 +216,7 @@ public:
             success = removeRoute();
         } while (success);
     }
-    Solution getSolution() { return s; }
+    Solution& getSolution() { return s; }
     template<class Iterator>
     void ejectionPoolExport(Iterator out)
     {
